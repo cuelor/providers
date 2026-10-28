@@ -1,0 +1,8 @@
+{
+  "manifest_version": 1,
+  "id": "example.native",
+  "name": "Example Native",
+  "version": "1.0.0",
+  "protocol": "1.0",
+  "runtime": { "kind": "exec", "command": ["/usr/local/bin/example-native-provider", "serve"] }
+}

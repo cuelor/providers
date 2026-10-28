@@ -1,0 +1,12 @@
+{
+  "id": "job_7c1a90",
+  "status": "queued",
+  "model": "example/video-1",
+  "route": "multimodal2video",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:00:00Z",
+  "approval": null,
+  "outputs": [],
+  "error": null,
+  "usage": null
+}

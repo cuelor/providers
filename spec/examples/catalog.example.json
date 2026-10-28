@@ -1,0 +1,123 @@
+{
+  "models": [
+    {
+      "id": "example/video-1",
+      "label": "Example Video 1",
+      "provider": "Example Labs",
+      "description": "Prompt references are passed to the upstream as an ordered list.",
+      "available": true,
+      "output": { "modality": "video" },
+      "parameters": [
+        { "name": "prompt", "kind": "text", "required": true, "max_length": 2000 },
+        { "name": "duration", "kind": "integer", "default": 5, "min": 4, "max": 15, "step": 1, "unit": "s", "widget": "slider" },
+        { "name": "ratio", "kind": "enum", "default": "16:9", "enum_values": ["16:9", "9:16", "1:1"] },
+        { "name": "video_resolution", "kind": "enum", "default": "720p", "enum_values": ["480p", "720p"] },
+        { "name": "audio", "kind": "boolean", "default": true },
+        { "name": "audio_prompt", "kind": "text", "max_length": 500, "label": "Sound", "visible_when": { "name": "audio", "equals": true } }
+      ],
+      "parameter_rules": [
+        { "when_name": "ratio", "when_values": ["1:1"], "reject_name": "video_resolution", "reject_values": ["480p"], "message": "480p is not available in 1:1" }
+      ],
+      "routes": [
+        {
+          "id": "multimodal2video",
+          "label": "Multimodal to video",
+          "input": {
+            "modality": "mixed",
+            "slots": [
+              { "id": "reference", "role": "reference", "modality": "image", "min_artifacts": 0, "max_artifacts": 9, "media_types": ["image/png", "image/jpeg"], "max_bytes": 31457280 },
+              { "id": "video_track", "role": "video_track", "modality": "video", "min_artifacts": 0, "max_artifacts": 3, "media_types": ["video/mp4"], "max_duration_ms": 15000 },
+              { "id": "audio_track", "role": "audio_track", "modality": "audio", "min_artifacts": 0, "max_artifacts": 3, "media_types": ["audio/mpeg", "audio/wav"] }
+            ],
+            "max_total_artifacts": 12
+          },
+          "parameter_names": ["prompt", "duration", "ratio", "video_resolution", "audio", "audio_prompt"],
+          "output": { "media_types": ["video/mp4"], "audio": "optional" },
+          "pricing": { "basis": "estimate", "unit": "second", "amount": 0.12, "currency": "USD", "note": "720p; audio included" }
+        }
+      ]
+    },
+    {
+      "id": "example/video-2",
+      "label": "Example Video 2",
+      "description": "The image is the first frame of the video.",
+      "available": true,
+      "output": { "modality": "video" },
+      "parameters": [
+        { "name": "prompt", "kind": "text", "required": true, "max_length": 2000 },
+        { "name": "duration", "kind": "integer", "default": 4, "enum_values": [4, 6, 8], "unit": "s" },
+        { "name": "motion", "kind": "number", "default": 0.5, "min": 0, "max": 1, "step": 0.25, "widget": "slider" }
+      ],
+      "routes": [
+        {
+          "id": "image2video",
+          "label": "Image to video",
+          "input": {
+            "slots": [
+              { "id": "first_frame", "role": "first_frame", "modality": "image", "min_artifacts": 1, "max_artifacts": 1, "media_types": ["image/png", "image/jpeg"], "max_bytes": 10485760 }
+            ],
+            "max_total_artifacts": 1
+          },
+          "parameter_names": ["prompt", "duration", "motion"],
+          "output": { "media_types": ["video/mp4"], "audio": "none" },
+          "pricing": { "basis": "estimate", "unit": "second", "amount": 0.2, "currency": "USD" }
+        }
+      ]
+    },
+    {
+      "id": "example/image-1",
+      "label": "Example Image 1",
+      "available": false,
+      "availability_reason": "The upstream account has no access to this model.",
+      "output": { "modality": "image" },
+      "parameters": [
+        { "name": "prompt", "kind": "text", "required": true, "max_length": 4000 },
+        { "name": "ratio", "kind": "enum", "default": "1:1", "enum_values": ["1:1", "16:9", "9:16"] }
+      ],
+      "routes": [
+        {
+          "id": "text2image",
+          "input": { "slots": [] },
+          "parameter_names": ["prompt", "ratio"],
+          "output": { "media_types": ["image/png"] },
+          "pricing": { "basis": "exact", "unit": "image", "amount": 0.04, "currency": "USD" }
+        },
+        {
+          "id": "image2image",
+          "input": {
+            "slots": [
+              { "id": "reference", "role": "reference", "modality": "image", "min_artifacts": 1, "max_artifacts": 4, "media_types": ["image/png", "image/jpeg", "image/webp"], "max_bytes": 10485760 }
+            ],
+            "max_total_artifacts": 4
+          },
+          "parameter_names": ["prompt", "ratio"],
+          "output": { "media_types": ["image/png"] }
+        }
+      ]
+    },
+    {
+      "id": "example/asr-1",
+      "label": "Example Speech Recognition",
+      "available": true,
+      "output": { "modality": "text" },
+      "parameters": [
+        { "name": "language", "kind": "string", "default": "auto" },
+        { "name": "timestamps", "kind": "enum", "default": "word", "enum_values": ["none", "segment", "word"] }
+      ],
+      "routes": [
+        {
+          "id": "audio2text",
+          "input": {
+            "slots": [
+              { "id": "audio", "role": "audio", "modality": "audio", "min_artifacts": 1, "max_artifacts": 1, "media_types": ["audio/wav", "audio/mpeg"], "max_bytes": 31457280, "max_duration_ms": 1800000 }
+            ],
+            "max_total_artifacts": 1
+          },
+          "parameter_names": ["language", "timestamps"],
+          "output": { "media_types": ["application/vnd.cuelor.transcript+json"] },
+          "pricing": { "basis": "estimate", "unit": "minute", "amount": 0.006, "currency": "USD" }
+        }
+      ]
+    }
+  ]
+}

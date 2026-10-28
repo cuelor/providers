@@ -1,0 +1,24 @@
+{
+  "protocol": {
+    "version": "1.0"
+  },
+  "provider": {
+    "id": "Acme_Images",
+    "name": "Acme Images (self-hosted)",
+    "version": "2026.10"
+  },
+  "capabilities": {
+    "generation": [
+      "image"
+    ],
+    "estimate": true
+  },
+  "account": {
+    "status": "ready",
+    "label": "Team account",
+    "binding": "6f1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c"
+  },
+  "billing": {
+    "unit": "USD"
+  }
+}

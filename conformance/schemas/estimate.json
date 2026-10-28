@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/estimate.json",
+  "title": "Estimate (POST /v1/estimates)",
+  "type": "object",
+  "required": ["estimate"],
+  "properties": {
+    "estimate": {
+      "type": "object",
+      "required": ["amount", "unit", "basis"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "unit": { "$ref": "common.json#/$defs/unit" },
+        "basis": {
+          "description": "`exact`: this request will cost exactly this amount. `estimate`: an approximation.",
+          "enum": ["exact", "estimate"]
+        },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

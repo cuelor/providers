@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "route multimodal2video accepts at most 3 video_track inputs",
+    "reason": "too_many_inputs",
+    "params": { "role": "video_track", "max": 3, "received": 4 }
+  }
+}

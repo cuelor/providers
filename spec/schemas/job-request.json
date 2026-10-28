@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/job-request.json",
+  "title": "Job request (POST /v1/jobs, POST /v1/estimates)",
+  "type": "object",
+  "required": ["model", "route", "input", "parameters"],
+  "properties": {
+    "model": { "type": "string", "minLength": 1 },
+    "route": { "type": "string", "minLength": 1 },
+    "input": {
+      "type": "object",
+      "required": ["artifacts"],
+      "properties": {
+        "artifacts": {
+          "description": "Ordered inputs. `position` numbers them from 0 without gaps; the order carries meaning.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["artifact_id", "role", "position"],
+            "properties": {
+              "artifact_id": { "type": "string", "minLength": 1 },
+              "role": { "type": "string", "minLength": 1 },
+              "position": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "description": "Values keyed by parameter name. The prompt is `parameters.prompt`.",
+      "type": "object"
+    },
+    "callback": {
+      "description": "Optional webhook (`capabilities.webhook`). Not used by the Cuelor app.",
+      "type": "object",
+      "required": ["url", "secret"],
+      "properties": {
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "secret": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

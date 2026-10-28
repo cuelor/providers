@@ -1,0 +1,89 @@
+# Tiers B and C against a real upstream. They create real jobs and may cost money, so they run only when
+# someone starts them by hand, inside the "live" environment (which can require approval and holds the
+# upstream keys). The key is an environment secret whose name starts with LIVE_; no other secret can be
+# read, and it reaches the plugin as CUELOR_PROVIDER_TEST_KEY, by name, never on a command line.
+name: Live conformance
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin directory, for example providers/openrouter
+        required: true
+        default: examples/fake-provider
+      max_cost:
+        description: The most the run may cost, in the plugin's billing unit
+        required: true
+        default: "0"
+      only:
+        description: Comma-separated check ids (empty for all)
+        required: false
+        default: ""
+      key_secret:
+        description: Secret of the live environment with the plugin's key, LIVE_[A-Z0-9_]+ (empty for none)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    environment: live
+    timeout-minutes: 60
+    steps:
+      - name: Check the inputs
+        env:
+          PLUGIN: ${{ inputs.plugin }}
+          MAX_COST: ${{ inputs.max_cost }}
+          ONLY: ${{ inputs.only }}
+          KEY_SECRET: ${{ inputs.key_secret }}
+        run: |
+          echo "$PLUGIN" | grep -Eq '^(providers|examples)/[a-z0-9][a-z0-9-]*$' || { echo "plugin must be providers/<name> or examples/<name>"; exit 2; }
+          echo "$MAX_COST" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || { echo "max_cost must be a number"; exit 2; }
+          echo "$ONLY" | grep -Eq '^([A-C][0-9]+(,[A-C][0-9]+)*)?$' || { echo "only must be check ids like A3,B2"; exit 2; }
+          if [ -n "$KEY_SECRET" ]; then
+            echo "$KEY_SECRET" | grep -Eq '^LIVE_[A-Z0-9_]+$' || { echo "key_secret must match ^LIVE_[A-Z0-9_]+$"; exit 2; }
+          fi
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.work
+          # The module and build cache is about 1 GB; saving and restoring it takes longer than a rebuild.
+          cache: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install ffprobe
+        run: sh scripts/install-ffprobe.sh
+      - name: Build
+        env:
+          PLUGIN: ${{ inputs.plugin }}
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build -w sdk/typescript
+          npm run build -w "$PLUGIN"
+          go -C conformance build -o ../dist/bin/cuelor-provider-test ./cmd/cuelor-provider-test
+      - name: Run tiers A, B and C
+        env:
+          PLUGIN: ${{ inputs.plugin }}
+          MAX_COST: ${{ inputs.max_cost }}
+          ONLY: ${{ inputs.only }}
+          # Checked above, and guarded here as well: a name without the LIVE_ prefix reads no secret.
+          CUELOR_PROVIDER_TEST_KEY: ${{ startsWith(inputs.key_secret, 'LIVE_') && secrets[inputs.key_secret] || '' }}
+        run: |
+          set -- --manifest "$PLUGIN/dist/cuelor-provider.json" --live --max-cost "$MAX_COST" --output json
+          [ -n "$ONLY" ] && set -- "$@" --only "$ONLY"
+          [ -n "$CUELOR_PROVIDER_TEST_KEY" ] && set -- "$@" --env CUELOR_PROVIDER_TEST_KEY
+          dist/bin/cuelor-provider-test "$@" > "$RUNNER_TEMP/live-report.json" && code=0 || code=$?
+          cat "$RUNNER_TEMP/live-report.json"
+          exit "$code"
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-report
+          path: ${{ runner.temp }}/live-report.json
+          if-no-files-found: ignore

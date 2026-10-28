@@ -1,0 +1,7 @@
+{
+  "id": "job_0d93ee",
+  "status": "failed",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:00:03Z",
+  "error": { "code": "submission_unknown", "message": "The upstream may have accepted this job; it was not submitted again." }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "@cuelor/provider-sdk",
+  "version": "1.0.0",
+  "description": "Build Cuelor Provider API v1 plugins: handshake, auth, idempotency, artifacts, references, transcripts.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cuelor/providers.git",
+    "directory": "sdk/typescript"
+  },
+  "homepage": "https://github.com/cuelor/providers/tree/main/sdk/typescript#readme",
+  "keywords": ["cuelor", "cuelor-provider"],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "7.0.2"
+  }
+}

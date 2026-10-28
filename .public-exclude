@@ -1,0 +1,3 @@
+# Paths that scripts/export-public.mjs leaves out of the public repository: one per line, relative to the
+# root, a directory with or without a final "/". This file is published too, so never list anything here
+# that may not be published. With no paths, everything is exported.

@@ -1,0 +1,16 @@
+{
+  "name": "cuelor-providers",
+  "private": true,
+  "description": "Workspace for the TypeScript parts of the Cuelor provider protocol.",
+  "license": "Apache-2.0",
+  "workspaces": [
+    "sdk/typescript",
+    "examples/fake-provider",
+    "providers/openrouter"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run build -w @cuelor/provider-sdk && npm test --workspaces"
+  }
+}

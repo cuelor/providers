@@ -1,0 +1,21 @@
+{
+  "name": "@cuelor/provider-openrouter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cuelor provider plugin for OpenRouter: images, video and transcription with the user's own OpenRouter key.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@cuelor/provider-sdk": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

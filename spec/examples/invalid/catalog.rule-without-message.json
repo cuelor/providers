@@ -1,0 +1,3 @@
+{ "models": [{ "id": "m", "label": "M", "available": true, "output": { "modality": "image" }, "routes": [{ "id": "text2image", "input": { "slots": [] }, "parameter_names": ["ratio"] }],
+  "parameters": [{ "name": "ratio", "kind": "enum", "default": "1:1", "enum_values": ["1:1", "16:9"] }],
+  "parameter_rules": [{ "when_name": "ratio", "when_values": ["16:9"], "reject_name": "resolution", "reject_values": ["4k"] }] }] }

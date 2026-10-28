@@ -1,0 +1,429 @@
+openapi: 3.1.0
+info:
+  title: Cuelor Provider API
+  version: 1.0.0
+  summary: The protocol between Cuelor and image, video and speech-recognition services.
+  description: |
+    The normative text is `spec/v1.md`; the JSON Schemas in `spec/schemas/` are the source of truth for
+    the shapes. This document describes the same contract for tooling.
+
+    Every request carries `Authorization: Bearer <token>` and SHOULD carry `Cuelor-Protocol: 1.<minor>`.
+    Both sides MUST ignore unknown fields. Every 4xx and 5xx response that the service itself produces
+    has the standard error body; a proxy or gateway in front of it may answer without it, and the client
+    then acts on the class of the HTTP status.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+servers:
+  - url: http://127.0.0.1:{port}
+    description: A local plugin (HTTP only on 127.0.0.1).
+    variables:
+      port:
+        default: "8787"
+  - url: https://provider.example.com
+    description: A self-hosted or remote service (HTTPS required).
+security:
+  - bearer: []
+tags:
+  - name: provider
+  - name: catalog
+  - name: artifacts
+  - name: jobs
+  - name: estimates
+  - name: setup
+paths:
+  /v1/provider:
+    get:
+      tags: [provider]
+      operationId: describeProvider
+      summary: Describe the service, its capabilities and account.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+      responses:
+        "200":
+          description: The provider description.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/provider-description.json"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/models:
+    get:
+      tags: [catalog]
+      operationId: listModels
+      summary: The catalog of models, routes, slots and parameters.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+      responses:
+        "200":
+          description: The catalog.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/catalog.json"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/artifacts:
+    post:
+      tags: [artifacts]
+      operationId: uploadArtifact
+      summary: Upload an input. The same bytes and type return the same id.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  description: The file, with a filename and a MIME type.
+                  type: string
+                  contentMediaType: application/octet-stream
+      responses:
+        "200":
+          description: The stored artifact (an existing one when the bytes and type were seen before).
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/artifact.json"
+        "201":
+          description: The stored artifact.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/artifact.json"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          description: The file exceeds the declared `max_bytes` (`payload_too_large`, `params.max_bytes`).
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/error.json"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/artifacts/{artifact_id}:
+    get:
+      tags: [artifacts]
+      operationId: getArtifact
+      summary: Artifact metadata.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+        - $ref: "#/components/parameters/ArtifactId"
+      responses:
+        "200":
+          description: The artifact.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/artifact.json"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/Expired"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/artifacts/{artifact_id}/content:
+    get:
+      tags: [artifacts]
+      operationId: downloadArtifact
+      summary: Artifact bytes. MUST send Content-Type and Content-Length; MAY support Range. MAY redirect (302, 307).
+      description: >-
+        The service MAY redirect to an address that does not require the bearer token and SHOULD expire
+        soon, for example a signed object-storage address. Clients follow at most 5 redirects, never send
+        Authorization to another origin (scheme, host or port), and never follow https to http. The
+        Content-Type and Content-Length requirements apply to the final response. No other endpoint
+        redirects (v1.md sections 3.4 and 3.8).
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+        - $ref: "#/components/parameters/ArtifactId"
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The bytes.
+          headers:
+            Content-Length:
+              required: true
+              schema:
+                type: integer
+          content:
+            "*/*":
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+        "206":
+          description: A byte range, when Range is supported.
+          content:
+            "*/*":
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+        "302":
+          description: The bytes are elsewhere. The address needs no bearer token and expires soon.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+        "307":
+          description: As 302.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/Expired"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/jobs:
+    post:
+      tags: [jobs]
+      operationId: createJob
+      summary: Submit a job. The same key and body return the same job.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./schemas/job-request.json"
+      responses:
+        "200":
+          description: The job (an existing one when the key was seen before with the same body).
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/job.json"
+        "201":
+          description: The new job.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/job.json"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: The key was used with a different body (`idempotency_conflict`). No job was created.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/error.json"
+        "422":
+          description: Rejected by content moderation at submission (`content_moderated`). No job was created.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/error.json"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/jobs/{job_id}:
+    get:
+      tags: [jobs]
+      operationId: getJob
+      summary: The current state of a job. SHOULD answer within 2 seconds.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/job.json"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/jobs/{job_id}/cancel:
+    post:
+      tags: [jobs]
+      operationId: cancelJob
+      summary: Best-effort, idempotent cancellation (`capabilities.cancel`).
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: The job, `cancelled` or unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/job.json"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/estimates:
+    post:
+      tags: [estimates]
+      operationId: estimateJob
+      summary: Price a job without creating it (`capabilities.estimate`). No Idempotency-Key, no charge.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./schemas/job-request.json"
+      responses:
+        "200":
+          description: The estimate.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/estimate.json"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/setup:
+    post:
+      tags: [setup]
+      operationId: startSetup
+      summary: A one-time local setup page (`capabilities.setup`). The key never passes through the client.
+      parameters:
+        - $ref: "#/components/parameters/CuelorProtocol"
+      responses:
+        "200":
+          description: The setup page.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/setup.json"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: |
+        Compared in constant time and never logged. A local plugin gets a random token from its host on
+        stdin; a remote service gets the token the user entered or the account token.
+  parameters:
+    CuelorProtocol:
+      name: Cuelor-Protocol
+      in: header
+      required: false
+      description: The protocol version the client implements, `1.<minor>`. Informational.
+      schema:
+        type: string
+        pattern: "^1\\.[0-9]+$"
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 1 to 128 visible ASCII characters. Scope is (account, key); kept at least 30 days.
+      schema:
+        $ref: "./schemas/common.json#/$defs/idempotency_key"
+    ArtifactId:
+      name: artifact_id
+      in: path
+      required: true
+      schema:
+        type: string
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: The standard error body.
+      content:
+        application/json:
+          schema:
+            $ref: "./schemas/error.json"
+    InvalidRequest:
+      description: "`invalid_request`, with `reason` such as `unknown_model`, `model_unavailable`, `unknown_route`, `too_many_inputs`, `unsupported_media_type`, `prompt_reference_out_of_range` or `artifact_not_found` (with `params.artifact_id`; the client uploads the input again and submits again). An unknown model is 400 `unknown_model`, never 404."
+      content:
+        application/json:
+          schema:
+            $ref: "./schemas/error.json"
+    Unauthorized:
+      description: "`unauthorized`: missing or wrong bearer token."
+      content:
+        application/json:
+          schema:
+            $ref: "./schemas/error.json"
+    Forbidden:
+      description: "`provider_not_ready` (the account is not `ready`) or `forbidden`."
+      content:
+        application/json:
+          schema:
+            $ref: "./schemas/error.json"
+    NotFound:
+      description: "`not_found`: the resource in the path (a job or an artifact) does not exist."
+      content:
+        application/json:
+          schema:
+            $ref: "./schemas/error.json"
+    Expired:
+      description: "`artifact_expired`. The client records the result as expired on its own side; the job's state does not change."
+      content:
+        application/json:
+          schema:
+            $ref: "./schemas/error.json"
+    RateLimited:
+      description: "`rate_limited` or `queue_full`. A temporary error; replay with the same key."
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "./schemas/error.json"

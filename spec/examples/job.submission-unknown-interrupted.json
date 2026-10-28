@@ -1,0 +1,14 @@
+{
+  "id": "job_41b7c2",
+  "status": "failed",
+  "model": "example/image-1",
+  "route": "text2image",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:02:10Z",
+  "error": {
+    "code": "submission_unknown",
+    "reason": "interrupted",
+    "message": "The service stopped while the upstream was generating this image; the upstream may have charged for it, and the result is lost."
+  },
+  "usage": { "amount": 0.04, "unit": "USD", "basis": "estimate" }
+}

@@ -1,0 +1,78 @@
+# Every pull request and every push to main: the leak scan, then make ck-verify (spec check, unit tests
+# of the suite, the scanner, the SDK and the example, and the conformance suite against the example fake
+# provider, including its deliberately broken builds). Nothing here calls a paid upstream.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  leak-scan:
+    name: Leak scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+      - name: Scan the files
+        env:
+          # Extra forbidden terms in plain text, kept out of the repository (scripts/scan-repo.mjs).
+          CUELOR_FORBIDDEN_TERMS: ${{ secrets.CUELOR_FORBIDDEN_TERMS }}
+        run: node scripts/scan-repo.mjs
+      - name: Scan the commit messages and the pull request
+        if: github.event_name == 'pull_request'
+        env:
+          CUELOR_FORBIDDEN_TERMS: ${{ secrets.CUELOR_FORBIDDEN_TERMS }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          git log --format=%B "$BASE..$HEAD" | node scripts/scan-repo.mjs --stdin --label commits
+          printf '%s\n%s\n' "$TITLE" "$BODY" | node scripts/scan-repo.mjs --stdin --label pull-request
+
+  verify:
+    name: make ck-verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.work
+          # The module and build cache is about 1 GB; saving and restoring it takes longer than a rebuild.
+          cache: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install ffprobe
+        run: sh scripts/install-ffprobe.sh
+      - name: make ck-verify
+        env:
+          CK_TEST_REPORT: ${{ runner.temp }}/ck-report.json
+          CUELOR_FORBIDDEN_TERMS: ${{ secrets.CUELOR_FORBIDDEN_TERMS }}
+          # Test keys for tier A of the plugins in providers/, one line per plugin (CONTRIBUTING.md):
+          #   CUELOR_TEST_KEY_<NAME>: ${{ secrets.CUELOR_TEST_KEY_<NAME> }}
+          # The values are repository secrets set by a maintainer; they never appear in the repository.
+        run: make ck-verify
+      - name: Keep the report and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ck-verify
+          path: |
+            ${{ runner.temp }}/ck-report.json
+            dist/ck-verify/
+          if-no-files-found: ignore

@@ -1,0 +1,7 @@
+{
+  "id": "job_41bb02",
+  "status": "pending_approval",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:00:01Z",
+  "approval": { "policy": "team_budget", "deadline": "2026-10-24T08:00:00Z" }
+}

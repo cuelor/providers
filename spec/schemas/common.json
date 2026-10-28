@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/common.json",
+  "title": "Cuelor Provider API v1: shared definitions",
+  "description": "Definitions shared by the other v1 schemas. Objects allow unknown members: receivers MUST ignore fields they do not recognise.",
+  "$defs": {
+    "error": {
+      "title": "Error object",
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "description": "Error category. Descriptive: services MAY use codes not listed in the specification; clients handle unknown codes by HTTP status.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["invalid_request", "unauthorized", "insufficient_credits", "provider_not_ready", "forbidden", "not_found", "idempotency_conflict", "artifact_expired", "payload_too_large", "content_moderated", "rate_limited", "queue_full", "internal_error", "upstream_unavailable", "upstream_failed", "timed_out", "invalid_input", "submission_unknown", "approval_rejected", "approval_expired", "cancelled"]
+        },
+        "message": {
+          "description": "English, human readable. MUST NOT contain secrets, full upstream URLs or signed parameters. SHOULD be at most 300 characters.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Finer-grained cause, for example `prompt_reference_out_of_range`.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["unknown_model", "artifact_not_found", "prompt_reference_out_of_range", "host_not_allowed", "origin_not_allowed", "region_restricted", "not_submitted"]
+        },
+        "params": {
+          "description": "Structured details for the reason, for example `{\"role\": \"video_track\", \"max\": 3, \"received\": 4}`.",
+          "type": "object"
+        }
+      }
+    },
+    "error_body": {
+      "title": "Error response body",
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": { "$ref": "#/$defs/error" }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string" }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/warning" }
+    },
+    "media_type": {
+      "description": "A MIME type without parameters, for example `image/png`.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}$"
+    },
+    "sha256": {
+      "description": "SHA-256 digest as 64 hexadecimal digits. Services SHOULD use lowercase; clients compare case-insensitively.",
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "binding": {
+      "description": "Stable fingerprint of the upstream account or credentials: 64 hexadecimal digits. MUST change when the account changes, and when the key changes unless the service still finds its jobs and idempotency records under the new key (v1.md section 3.2).",
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "timestamp": {
+      "description": "RFC 3339 date-time.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "description": "Value of the `Idempotency-Key` header: 1 to 128 visible ASCII characters (0x21-0x7E).",
+      "type": "string",
+      "pattern": "^[!-~]{1,128}$"
+    },
+    "prompt_reference": {
+      "description": "A reference to an ordered input inside a prompt. In running text a reference is `@(image|video|audio)[1-9][0-9]*` not immediately followed by another digit; any other `@` is plain text.",
+      "type": "string",
+      "pattern": "^@(image|video|audio)[1-9][0-9]*$"
+    },
+    "unit": {
+      "description": "`credits` (the official service) or an ISO 4217 currency code.",
+      "type": "string",
+      "pattern": "^(credits|[A-Z]{3})$"
+    },
+    "language_tag": {
+      "description": "BCP 47 language tag, for example `en` or `zh`.",
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+    },
+    "usage": {
+      "title": "Usage of a job",
+      "type": "object",
+      "required": ["amount", "unit", "basis"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "unit": { "$ref": "#/$defs/unit" },
+        "basis": {
+          "description": "`billed`: what the upstream or the official service actually charged. `estimate`: the service's own calculation.",
+          "enum": ["billed", "estimate"]
+        }
+      }
+    },
+    "artifact_metadata": {
+      "description": "Optional media metadata. Images: `width`, `height`. Video: also `duration_ms`, `audio`. Audio: `duration_ms`, `sample_rate`.",
+      "type": "object",
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "audio": { "type": "boolean" },
+        "sample_rate": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "protocol": { "version": "1.0" },
+  "provider": { "id": "example.images", "name": "Example Images", "version": "0.3.1" },
+  "capabilities": {},
+  "account": { "status": "ready", "binding": "6f1c" },
+  "billing": { "unit": "USD" }
+}

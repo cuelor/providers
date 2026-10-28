@@ -1,0 +1,1 @@
+{ "manifest_version": 1, "id": "images", "name": "Images", "version": "1.0.0", "protocol": "1.0", "runtime": { "kind": "node", "entry": "provider.mjs" } }

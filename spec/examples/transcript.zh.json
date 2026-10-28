@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "language": "zh",
+  "language_probability": 0.97,
+  "unit": "character",
+  "text": "今天下雨",
+  "segments": [
+    {
+      "text": "今天下雨",
+      "start_ms": 0,
+      "end_ms": 1320,
+      "timed_text_units": [
+        { "text": "今", "start_ms": 0, "end_ms": 280 },
+        { "text": "天", "start_ms": 280, "end_ms": 560 },
+        { "text": "下", "start_ms": 600, "end_ms": 900 },
+        { "text": "雨", "start_ms": 900, "end_ms": 1320 }
+      ]
+    }
+  ],
+  "provider": { "name": "example-asr" }
+}

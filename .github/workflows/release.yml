@@ -1,0 +1,223 @@
+# Releases from tags. Each part of the repository has its own tag:
+#
+#   spec-vX.Y.Z          the specification: a tarball of spec/ with SHA256SUMS and a build attestation
+#   sdk-vX.Y.Z           @cuelor/provider-sdk on npm, with provenance
+#   conformance/vX.Y.Z   the Go module (served by the Go proxy from the tag) and cuelor-provider-test
+#                        binaries with SHA256SUMS and attestations
+#   <plugin>-vX.Y.Z      the plugin in providers/<plugin>: provider.mjs, cuelor-provider.json,
+#                        SHA256SUMS and attestations
+#
+# Every release first runs make ck-verify and checks that the tag matches the version in the files.
+#
+# Releases happen only on the public repository, where the tags are made (CONTRIBUTING.md, "Publishing").
+# Every job checks the repository, so a tag of the same name elsewhere publishes nothing.
+name: Release
+
+on:
+  push:
+    tags:
+      - "spec-v*.*.*"
+      - "sdk-v*.*.*"
+      - "conformance/v*.*.*"
+      - "*-v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.repository == 'cuelor/providers'
+    runs-on: ubuntu-latest
+    outputs:
+      kind: ${{ steps.plan.outputs.kind }}
+      version: ${{ steps.plan.outputs.version }}
+      plugin: ${{ steps.plan.outputs.plugin }}
+      key_suffix: ${{ steps.plan.outputs.key_suffix }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - id: plan
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$TAG" in
+            spec-v*) kind=spec; version=${TAG#spec-v} ;;
+            sdk-v*) kind=sdk; version=${TAG#sdk-v} ;;
+            conformance/v*) kind=conformance; version=${TAG#conformance/v} ;;
+            *-v*) kind=plugin; plugin=${TAG%-v*}; version=${TAG##*-v} ;;
+            *) echo "unknown tag $TAG"; exit 1 ;;
+          esac
+          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || { echo "bad version $version"; exit 1; }
+          case "$kind" in
+            spec)
+              # The section must have its release date: "## [1.0.0] - 2026-10-27", not "- unreleased".
+              v=$(printf '%s' "$version" | sed 's/[.]/\\./g')
+              grep -Eq "^## \[$v\] - [0-9]{4}-[0-9]{2}-[0-9]{2}\$" spec/CHANGELOG.md || { echo "spec/CHANGELOG.md has no dated entry for $version"; exit 1; } ;;
+            sdk) test "$(node -p 'require("./sdk/typescript/package.json").version')" = "$version" || { echo "sdk/typescript/package.json is not $version"; exit 1; } ;;
+            conformance) grep -q "Version = \"$version\"" conformance/conformance.go || { echo "conformance.Version is not $version"; exit 1; } ;;
+            plugin)
+              echo "$plugin" | grep -Eq '^[a-z0-9][a-z0-9-]*$' || { echo "bad plugin name $plugin"; exit 1; }
+              test -f "providers/$plugin/package.json" || { echo "no plugin providers/$plugin"; exit 1; }
+              test "$(node -p "require('./providers/$plugin/package.json').version")" = "$version" || { echo "providers/$plugin/package.json is not $version"; exit 1; } ;;
+          esac
+          # The plugin's test key is the secret CUELOR_TEST_KEY_<NAME> (CONTRIBUTING.md).
+          key_suffix=$(printf '%s' "${plugin:-}" | tr 'a-z-' 'A-Z_')
+          { echo "kind=$kind"; echo "version=$version"; echo "plugin=${plugin:-}"; echo "key_suffix=$key_suffix"; } >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: plan
+    if: github.repository == 'cuelor/providers'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.work
+          # The module and build cache is about 1 GB; saving and restoring it takes longer than a rebuild.
+          cache: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: sh scripts/install-ffprobe.sh
+      - env:
+          CUELOR_FORBIDDEN_TERMS: ${{ secrets.CUELOR_FORBIDDEN_TERMS }}
+          # Test keys for tier A of the plugins in providers/, as in ci.yml, one line per plugin:
+          #   CUELOR_TEST_KEY_<NAME>: ${{ secrets.CUELOR_TEST_KEY_<NAME> }}
+        run: make ck-verify
+
+  spec:
+    needs: [plan, verify]
+    if: github.repository == 'cuelor/providers' && needs.plan.outputs.kind == 'spec'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Package
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          mkdir -p out
+          tar -czf "out/cuelor-provider-spec-$VERSION.tar.gz" --transform "s,^spec,cuelor-provider-spec-$VERSION," spec
+          (cd out && sha256sum -- * > SHA256SUMS)
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: out/*.tar.gz
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" out/* --title "Specification $TAG" --notes "See spec/CHANGELOG.md."
+
+  sdk:
+    needs: [plan, verify]
+    if: github.repository == 'cuelor/providers' && needs.plan.outputs.kind == 'sdk'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build -w sdk/typescript && npm test -w sdk/typescript
+      - name: Publish with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish -w sdk/typescript --provenance --access public
+
+  conformance:
+    needs: [plan, verify]
+    if: github.repository == 'cuelor/providers' && needs.plan.outputs.kind == 'conformance'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.work
+          # The module and build cache is about 1 GB; saving and restoring it takes longer than a rebuild.
+          cache: false
+      - name: Build
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          mkdir -p out
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${target%/*}; arch=${target#*/}
+            name="cuelor-provider-test_${VERSION}_${os}_${arch}"
+            (cd conformance && CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w" -o "../out/$name/cuelor-provider-test" ./cmd/cuelor-provider-test)
+            cp LICENSE "out/$name/"
+            tar -C out -czf "out/$name.tar.gz" "$name"
+            rm -r "out/$name"
+          done
+          (cd out && sha256sum -- *.tar.gz > SHA256SUMS)
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: out/*.tar.gz
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" out/* --title "Conformance suite $TAG" --notes "go install github.com/cuelor/providers/conformance/cmd/cuelor-provider-test@v${TAG#conformance/v}"
+
+  plugin:
+    needs: [plan, verify]
+    if: github.repository == 'cuelor/providers' && needs.plan.outputs.kind == 'plugin'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.work
+          # The module and build cache is about 1 GB; saving and restoring it takes longer than a rebuild.
+          cache: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Build and run tier A
+        env:
+          PLUGIN: ${{ needs.plan.outputs.plugin }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          KEY_SUFFIX: ${{ needs.plan.outputs.key_suffix }}
+          # Only secrets named CUELOR_TEST_KEY_* can be read here; the name comes from the tag.
+          TEST_KEY: ${{ secrets[format('CUELOR_TEST_KEY_{0}', needs.plan.outputs.key_suffix)] }}
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build -w sdk/typescript
+          go -C conformance build -o ../dist/bin/cuelor-provider-test ./cmd/cuelor-provider-test
+          # check-plugins.sh builds the plugin and runs tier A, passing the key by name, never on a command line.
+          if [ -n "$TEST_KEY" ]; then export "CUELOR_TEST_KEY_$KEY_SUFFIX=$TEST_KEY"; fi
+          unset TEST_KEY
+          sh scripts/check-plugins.sh "$PLUGIN"
+          dist="providers/$PLUGIN/dist"
+          test "$(node -p "require('./$dist/cuelor-provider.json').version")" = "$VERSION" || { echo "the manifest is not $VERSION"; exit 1; }
+          mkdir -p out
+          cp "$dist/provider.mjs" "$dist/cuelor-provider.json" out/
+          (cd out && sha256sum -- provider.mjs cuelor-provider.json > SHA256SUMS)
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            out/provider.mjs
+            out/cuelor-provider.json
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release create "$TAG" out/* --title "$TAG" --notes "Check with: gh attestation verify provider.mjs --repo $REPO"

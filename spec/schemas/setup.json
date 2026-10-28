@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/setup.json",
+  "title": "Setup page (POST /v1/setup)",
+  "description": "A one-time local page where the user sets the upstream key or logs in. The key never passes through the client.",
+  "type": "object",
+  "required": ["url"],
+  "properties": {
+    "url": {
+      "description": "For a local plugin: `http://127.0.0.1:<port>/setup/<random>`, valid for 10 minutes and for one use.",
+      "type": "string",
+      "format": "uri"
+    },
+    "expires_at": { "$ref": "common.json#/$defs/timestamp" }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "manifest_version": 1,
+  "id": "example.fake",
+  "name": "Fake Provider",
+  "version": "0.1.0",
+  "description": "An example plugin backed by a fake upstream: images, video and transcription without network or cost.",
+  "publisher": "example",
+  "repository": "https://github.com/cuelor/providers",
+  "license": "Apache-2.0",
+  "protocol": "1.0",
+  "capabilities": ["image", "video", "transcription"],
+  "runtime": { "kind": "node", "entry": "provider.mjs" },
+  "network": [],
+  "test": {
+    "image": { "model": "example/fake-image", "route": "text2image", "parameters": { "prompt": "a red square" } },
+    "video": { "model": "example/fake-video", "route": "text2video", "parameters": { "prompt": "a blue sky", "duration": 1 } },
+    "transcription": { "model": "example/fake-asr", "route": "audio2text", "parameters": { "timestamps": "word" } }
+  }
+}

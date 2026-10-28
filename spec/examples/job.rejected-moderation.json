@@ -1,0 +1,12 @@
+{
+  "id": "job_c2f001",
+  "status": "rejected",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:00:40Z",
+  "error": {
+    "code": "content_moderated",
+    "message": "The upstream filtered the output.",
+    "params": { "stage": "output", "source": "upstream", "category": "violence" }
+  },
+  "usage": { "amount": 0.04, "unit": "USD", "basis": "billed" }
+}

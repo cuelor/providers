@@ -1,0 +1,26 @@
+{
+  "protocol": { "version": "1.0" },
+  "provider": {
+    "id": "example.images",
+    "name": "Example Images",
+    "version": "0.3.1",
+    "repository": "https://example.com/example-images"
+  },
+  "capabilities": {
+    "generation": ["image", "video"],
+    "transcription": true,
+    "cancel": true,
+    "estimate": true,
+    "webhook": false,
+    "setup": true
+  },
+  "account": {
+    "status": "ready",
+    "label": "Example key …a1b2",
+    "binding": "6f1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c",
+    "warnings": [
+      { "code": "non_commercial", "message": "The current upstream plan does not allow commercial use of outputs." }
+    ]
+  },
+  "billing": { "unit": "USD" }
+}

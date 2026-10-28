@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/provider-description.json",
+  "title": "Provider description (GET /v1/provider)",
+  "type": "object",
+  "required": ["protocol", "provider", "capabilities", "account", "billing"],
+  "properties": {
+    "protocol": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": {
+          "description": "Protocol version implemented by the service, `<major>.<minor>`. Clients do not use a service whose major version is not 1.",
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "required": ["id", "name", "version"],
+      "properties": {
+        "id": {
+          "description": "Service id. For a local plugin it MUST equal the manifest `id` (whose syntax `manifest.json` constrains); a self-hosted service has no manifest and may use any non-empty id. The official service is `cuelor`.",
+          "type": "string",
+          "minLength": 1
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string", "format": "uri" }
+      }
+    },
+    "capabilities": {
+      "description": "What the service implements. A missing boolean means false; a missing `generation` means no generation.",
+      "type": "object",
+      "properties": {
+        "generation": {
+          "description": "Output modalities the service can generate.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "examples": ["image", "video"] },
+          "uniqueItems": true
+        },
+        "transcription": { "type": "boolean" },
+        "cancel": { "type": "boolean" },
+        "estimate": { "type": "boolean" },
+        "webhook": { "type": "boolean", "description": "Optional webhooks (v1.md section 3.5.6). Not used by the Cuelor app." },
+        "setup": { "type": "boolean" }
+      }
+    },
+    "account": {
+      "type": "object",
+      "required": ["status", "binding"],
+      "properties": {
+        "status": {
+          "description": "`ready`: usable. `needs_setup`: no upstream key or login yet. `invalid_credentials`: the upstream rejected the current key.",
+          "enum": ["ready", "needs_setup", "invalid_credentials"]
+        },
+        "label": {
+          "description": "Human-readable account description. MUST NOT contain the full key.",
+          "type": "string"
+        },
+        "binding": { "$ref": "common.json#/$defs/binding" },
+        "warnings": {
+          "description": "Account-level notices. Agreed code: `non_commercial`.",
+          "$ref": "common.json#/$defs/warnings"
+        }
+      }
+    },
+    "billing": {
+      "type": "object",
+      "required": ["unit"],
+      "properties": {
+        "unit": { "$ref": "common.json#/$defs/unit" }
+      }
+    }
+  }
+}

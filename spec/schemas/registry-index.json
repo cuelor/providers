@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/registry-index.json",
+  "title": "Plugin index (registry/index.json)",
+  "description": "Known provider plugins. Listing means the format and conformance tier A were checked; it is not a guarantee of the plugin's behaviour.",
+  "type": "object",
+  "required": ["index_version", "providers"],
+  "properties": {
+    "index_version": { "const": 1 },
+    "providers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "name", "description", "repository", "latest_version", "manifest_url", "asset_url", "sha256", "capabilities", "maintainer", "maintained_by_cuelor"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+$" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "repository": { "type": "string", "format": "uri" },
+        "latest_version": { "type": "string", "minLength": 1 },
+        "manifest_url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "asset_url": {
+          "description": "The plugin file (`provider.mjs` for the node runtime).",
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "sha256": {
+          "description": "SHA-256 of the file at `asset_url`.",
+          "$ref": "common.json#/$defs/sha256"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "maintainer": { "type": "string", "minLength": 1 },
+        "maintained_by_cuelor": { "type": "boolean" }
+      }
+    }
+  }
+}

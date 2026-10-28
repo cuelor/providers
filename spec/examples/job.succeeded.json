@@ -1,0 +1,25 @@
+{
+  "id": "job_7c1a90",
+  "status": "succeeded",
+  "model": "example/video-1",
+  "route": "multimodal2video",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:01:12Z",
+  "progress": { "percent": 100 },
+  "approval": null,
+  "outputs": [
+    {
+      "artifact_id": "art_out",
+      "role": "output",
+      "media_type": "video/mp4",
+      "bytes": 10485760,
+      "sha256": "e3b98a4da31a127d4bde6e43033f66ba274cab0eb7eb1c70ec41402bf6273dd8",
+      "metadata": { "width": 1280, "height": 720, "duration_ms": 5000, "audio": true }
+    }
+  ],
+  "error": null,
+  "usage": { "amount": 0.6, "unit": "USD", "basis": "billed" },
+  "warnings": [
+    { "code": "prompt_rewritten", "message": "The upstream rewrote the prompt before generating." }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/artifact.json",
+  "title": "Artifact (POST /v1/artifacts, GET /v1/artifacts/{id})",
+  "description": "A file kept by the service: an uploaded input or a job output. The upload response carries at least `id`, `media_type`, `bytes` and `sha256`.",
+  "type": "object",
+  "required": ["id", "media_type", "bytes", "sha256"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "media_type": { "$ref": "common.json#/$defs/media_type" },
+    "bytes": { "type": "integer", "minimum": 0 },
+    "sha256": { "$ref": "common.json#/$defs/sha256" },
+    "created_at": { "$ref": "common.json#/$defs/timestamp" },
+    "expires_at": { "$ref": "common.json#/$defs/timestamp" },
+    "metadata": { "$ref": "common.json#/$defs/artifact_metadata" }
+  }
+}

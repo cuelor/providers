@@ -1,0 +1,9 @@
+{
+  "speech": [
+    { "file": "en.wav", "language": "en", "text": "The quick brown fox jumps over the lazy dog.", "duration_ms": 3438 },
+    { "file": "zh.wav", "language": "zh", "text": "今天天气很好，我们去公园散步。", "duration_ms": 4974 }
+  ],
+  "video": [
+    { "file": "video.mp4", "media_type": "video/mp4", "duration_ms": 1000, "width": 64, "height": 64 }
+  ]
+}

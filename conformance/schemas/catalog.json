@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/catalog.json",
+  "title": "Catalog (GET /v1/models)",
+  "type": "object",
+  "required": ["models"],
+  "properties": {
+    "models": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/model" }
+    }
+  },
+  "$defs": {
+    "model": {
+      "type": "object",
+      "required": ["id", "label", "available", "output", "parameters", "routes"],
+      "properties": {
+        "id": {
+          "description": "Unique within one service. MAY contain `/`.",
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "description": "Who makes the model, for display (for example the model vendor).",
+          "type": "string"
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "available": { "type": "boolean" },
+        "availability_reason": {
+          "description": "Why the model is not available, for display.",
+          "type": ["string", "null"]
+        },
+        "output": {
+          "type": "object",
+          "required": ["modality"],
+          "properties": {
+            "modality": {
+              "description": "Output modality of the model.",
+              "type": "string",
+              "minLength": 1,
+              "examples": ["image", "video", "text"]
+            }
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        },
+        "parameter_rules": {
+          "description": "Rules that combine parameters (`parameter_rule`).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter_rule" }
+        },
+        "routes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/route" }
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["name", "kind"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": {
+          "description": "Parameter type. Descriptive: v1 defines `text`, `string`, `number`, `integer`, `boolean` and `enum`.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["text", "string", "number", "integer", "boolean", "enum"]
+        },
+        "required": { "type": "boolean" },
+        "default": {},
+        "enum_values": {
+          "description": "Allowed values. Required for `enum`. A `number` or `integer` parameter MAY list its allowed values here too, as numbers of its kind (for example `duration` with `[4, 6, 8]`); clients MUST support this.",
+          "type": "array",
+          "items": { "type": ["string", "number", "integer", "boolean"] }
+        },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": {
+          "description": "Values are `min + k * step` for a whole number `k` (from 0 without `min`), compared with a small tolerance. MAY be fractional for a `number` parameter.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": { "type": "string" },
+        "label": { "type": "string" },
+        "max_length": {
+          "description": "Maximum number of characters of a `text` parameter.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "widget": {
+          "description": "Display hint, for example `slider`. v1 does not fix its values; clients ignore hints they do not know.",
+          "type": "string"
+        },
+        "visible_when": {
+          "description": "Display condition: the parameter is shown while the parameter `name` has the value `equals` (any JSON value, `null` included).",
+          "type": "object",
+          "required": ["name", "equals"],
+          "properties": {
+            "name": { "type": "string" },
+            "equals": {}
+          }
+        }
+      }
+    },
+    "parameter_rule": {
+      "description": "While the parameter `when_name` has one of `when_values`, the parameter `reject_name` MUST NOT have one of `reject_values`. `message` explains the rule in English, for people.",
+      "type": "object",
+      "required": ["when_name", "when_values", "reject_name", "reject_values", "message"],
+      "properties": {
+        "when_name": { "type": "string" },
+        "when_values": { "type": "array", "items": { "type": "string" } },
+        "reject_name": { "type": "string" },
+        "reject_values": { "type": "array", "items": { "type": "string" } },
+        "message": { "type": "string" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "required": ["id", "input", "parameter_names"],
+      "properties": {
+        "id": {
+          "description": "Route id. Descriptive: v1 defines `text2image`, `image2image`, `text2video`, `image2video` (one `first_frame` image), `frames2video`, `multiframe2video`, `multimodal2video` and `audio2text`.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["text2image", "image2image", "text2video", "image2video", "frames2video", "multiframe2video", "multimodal2video", "audio2text"]
+        },
+        "label": { "type": "string" },
+        "description": {
+          "description": "Free text. SHOULD explain how prompt references are translated for the upstream.",
+          "type": "string"
+        },
+        "input": {
+          "type": "object",
+          "required": ["slots"],
+          "properties": {
+            "modality": { "type": "string" },
+            "slots": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/slot" }
+            },
+            "max_total_artifacts": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "parameter_names": {
+          "description": "Names of the model parameters that apply to this route.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "media_types": {
+              "type": "array",
+              "items": { "$ref": "common.json#/$defs/media_type" }
+            },
+            "audio": {
+              "description": "Sound of a video route: `none`, `always`, or `optional` (decided by the `audio` parameter).",
+              "enum": ["none", "always", "optional"]
+            }
+          }
+        },
+        "pricing": { "$ref": "#/$defs/pricing" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "required": ["id", "role", "modality", "min_artifacts", "max_artifacts", "media_types"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "role": {
+          "description": "Input role. Descriptive: v1 defines `reference`, `video_track`, `audio_track`, `first_frame`, `last_frame`, `frame` and `audio`.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["reference", "video_track", "audio_track", "first_frame", "last_frame", "frame", "audio"]
+        },
+        "modality": {
+          "type": "string",
+          "minLength": 1,
+          "examples": ["image", "video", "audio"]
+        },
+        "min_artifacts": { "type": "integer", "minimum": 0 },
+        "max_artifacts": { "type": "integer", "minimum": 0 },
+        "media_types": {
+          "type": "array",
+          "items": { "$ref": "common.json#/$defs/media_type" }
+        },
+        "max_bytes": {
+          "description": "Upper bound for the size of one input.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_duration_ms": {
+          "description": "Upper bound for the duration of one audio or video input.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "pricing": {
+      "description": "Price hint for display when choosing a model. Exact prices come from POST /v1/estimates.",
+      "type": "object",
+      "required": ["basis", "unit", "amount", "currency"],
+      "properties": {
+        "basis": { "enum": ["exact", "estimate"] },
+        "unit": {
+          "description": "What one `amount` buys: `image`, `second`, `character`, `minute` or `job`.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["image", "second", "character", "minute", "job"]
+        },
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "$ref": "common.json#/$defs/unit" },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

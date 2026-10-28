@@ -1,0 +1,12 @@
+{
+  "model": "example/video-1",
+  "route": "multimodal2video",
+  "input": {
+    "artifacts": [
+      { "artifact_id": "art_a", "role": "reference", "position": 0 },
+      { "artifact_id": "art_b", "role": "video_track", "position": 1 },
+      { "artifact_id": "art_c", "role": "reference", "position": 2 }
+    ]
+  },
+  "parameters": { "prompt": "The person in @image1 walks into the street of @video1 and looks back at @image2", "duration": 5, "ratio": "16:9" }
+}

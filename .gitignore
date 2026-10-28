@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-test/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+.forbidden-terms

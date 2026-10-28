@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "the prompt references @image3 but the request has 2 image inputs",
+    "reason": "prompt_reference_out_of_range",
+    "params": { "reference": "@image3", "available": 2 }
+  }
+}

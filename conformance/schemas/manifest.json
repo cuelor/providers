@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/manifest.json",
+  "title": "Plugin manifest (cuelor-provider.json)",
+  "type": "object",
+  "required": ["manifest_version", "id", "name", "version", "protocol", "runtime"],
+  "properties": {
+    "manifest_version": { "const": 1 },
+    "id": {
+      "description": "`<publisher>.<name>`: lowercase letters, digits and `-`. The `cuelor.` prefix is reserved for plugins maintained by Cuelor; `cuelor` without a dot is the official service.",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+$"
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "version": {
+      "description": "Semantic version of the plugin.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "description": { "type": "string" },
+    "publisher": { "type": "string" },
+    "repository": { "type": "string", "format": "uri" },
+    "license": {
+      "description": "SPDX license expression.",
+      "type": "string"
+    },
+    "protocol": {
+      "description": "Implemented protocol version, `<major>.<minor>`.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "capabilities": {
+      "description": "For display and the index only; GET /v1/provider is authoritative.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "examples": ["image", "video", "transcription"] },
+      "uniqueItems": true
+    },
+    "runtime": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "entry"],
+          "properties": {
+            "kind": { "const": "node" },
+            "entry": {
+              "description": "JavaScript file run by the host's Node, relative to the manifest.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "command"],
+          "properties": {
+            "kind": { "const": "exec" },
+            "command": {
+              "description": "Absolute path of an executable, followed by its arguments.",
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "network": {
+      "description": "Hosts the plugin connects to. Declared for the user; not enforced in v1.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "setup": {
+      "type": "object",
+      "properties": {
+        "login_command": {
+          "description": "The plugin's own login subcommand, as arguments to the plugin.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "docs": { "type": "string", "format": "uri" }
+      }
+    },
+    "test": {
+      "description": "The cheapest model and parameters for the paid conformance tiers B and C, keyed by capability.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/test_case" }
+    }
+  },
+  "$defs": {
+    "test_case": {
+      "type": "object",
+      "required": ["model", "route"],
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "route": { "type": "string", "minLength": 1 },
+        "parameters": { "type": "object" }
+      }
+    }
+  }
+}

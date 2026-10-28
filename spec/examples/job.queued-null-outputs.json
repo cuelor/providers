@@ -1,0 +1,12 @@
+{
+  "id": "job_7c1a91",
+  "status": "queued",
+  "model": "example/image-1",
+  "route": "text2image",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:00:00Z",
+  "approval": null,
+  "outputs": null,
+  "error": null,
+  "usage": null
+}

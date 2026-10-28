@@ -1,0 +1,14 @@
+{
+  "id": "job_4b20c7",
+  "status": "failed",
+  "model": "example/image-1",
+  "route": "text2image",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:00:41Z",
+  "error": {
+    "code": "upstream_failed",
+    "reason": "not_submitted",
+    "message": "The upstream did not accept the job; submit it again with a new key.",
+    "params": { "original_status": 503, "original_code": "upstream_unavailable" }
+  }
+}

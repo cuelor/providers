@@ -1,0 +1,19 @@
+{
+  "manifest_version": 1,
+  "id": "example.images",
+  "name": "Example Images",
+  "version": "0.3.1",
+  "description": "Images, video and transcription through one Example key.",
+  "publisher": "example",
+  "repository": "https://example.com/example-images",
+  "license": "Apache-2.0",
+  "protocol": "1.0",
+  "capabilities": ["image", "video", "transcription"],
+  "runtime": { "kind": "node", "entry": "provider.mjs" },
+  "network": ["api.example.com"],
+  "setup": { "login_command": ["login"], "docs": "https://example.com/example-images#setup" },
+  "test": {
+    "image": { "model": "example/image-1", "route": "text2image", "parameters": { "prompt": "a red square" } },
+    "transcription": { "model": "example/asr-1", "route": "audio2text", "parameters": { "timestamps": "word" } }
+  }
+}

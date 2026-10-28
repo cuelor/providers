@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/job.json",
+  "title": "Job object",
+  "type": "object",
+  "required": ["id", "status", "created_at", "updated_at"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "status": {
+      "description": "Closed within v1. Terminal: succeeded, failed, rejected, expired, cancelled.",
+      "enum": ["queued", "running", "pending_approval", "succeeded", "failed", "rejected", "expired", "cancelled"]
+    },
+    "model": { "type": "string" },
+    "route": { "type": "string" },
+    "created_at": { "$ref": "common.json#/$defs/timestamp" },
+    "updated_at": {
+      "description": "MUST NOT decrease.",
+      "$ref": "common.json#/$defs/timestamp"
+    },
+    "progress": {
+      "description": "For display only.",
+      "type": ["object", "null"],
+      "properties": {
+        "percent": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "approval": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/approval" }
+      ]
+    },
+    "outputs": {
+      "description": "Outputs of a succeeded job. `null` and `[]` both mean none; a succeeded job has a non-empty array.",
+      "type": ["array", "null"],
+      "items": { "$ref": "#/$defs/output" }
+    },
+    "error": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "common.json#/$defs/error" }
+      ]
+    },
+    "usage": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "common.json#/$defs/usage" }
+      ]
+    },
+    "warnings": {
+      "description": "Notices about a job that still runs normally. Agreed codes: `prompt_rewritten`, `model_substituted`, `parameter_ignored`.",
+      "$ref": "common.json#/$defs/warnings"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["status"], "properties": { "status": { "const": "succeeded" } } },
+      "then": {
+        "required": ["outputs"],
+        "properties": { "outputs": { "type": "array", "minItems": 1 } }
+      },
+      "else": {
+        "properties": { "outputs": { "maxItems": 0 } }
+      }
+    },
+    {
+      "if": { "required": ["status"], "properties": { "status": { "enum": ["failed", "rejected", "expired", "cancelled"] } } },
+      "then": {
+        "required": ["error"],
+        "properties": { "error": { "$ref": "common.json#/$defs/error" } }
+      }
+    },
+    {
+      "if": { "required": ["status"], "properties": { "status": { "const": "pending_approval" } } },
+      "then": {
+        "required": ["approval"],
+        "properties": { "approval": { "$ref": "#/$defs/approval" } }
+      }
+    }
+  ],
+  "$defs": {
+    "approval": {
+      "type": "object",
+      "required": ["policy", "deadline"],
+      "properties": {
+        "policy": { "type": "string", "minLength": 1 },
+        "deadline": { "$ref": "common.json#/$defs/timestamp" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["artifact_id", "role", "media_type", "bytes", "sha256"],
+      "properties": {
+        "artifact_id": { "type": "string", "minLength": 1 },
+        "role": {
+          "description": "`output` for images and video, `transcript` for a transcription result.",
+          "type": "string",
+          "minLength": 1,
+          "examples": ["output", "transcript"]
+        },
+        "media_type": { "$ref": "common.json#/$defs/media_type" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "common.json#/$defs/sha256" },
+        "metadata": { "$ref": "common.json#/$defs/artifact_metadata" }
+      }
+    }
+  }
+}

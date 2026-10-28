@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/error.json",
+  "title": "Error response body",
+  "description": "`{\"error\": {\"code\", \"message\", \"reason\"?, \"params\"?}}`, returned with every 4xx and 5xx response the service itself produces. A proxy or gateway in front of the service may answer without it; clients then act on the class of the HTTP status.",
+  "$ref": "common.json#/$defs/error_body"
+}

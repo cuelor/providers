@@ -1,0 +1,18 @@
+{
+  "index_version": 1,
+  "providers": [
+    {
+      "id": "example.images",
+      "name": "Example Images",
+      "description": "Images, video and transcription through one Example key.",
+      "repository": "https://example.com/example-images",
+      "latest_version": "0.3.1",
+      "manifest_url": "https://example.com/example-images/releases/0.3.1/cuelor-provider.json",
+      "asset_url": "https://example.com/example-images/releases/0.3.1/provider.mjs",
+      "sha256": "9b74c9897bac770ffc029102a200c5de2e1f6f1f9a2a8e2d7f5d8e3c1b0a9f8e",
+      "capabilities": ["image", "video", "transcription"],
+      "maintainer": "Example Labs",
+      "maintained_by_cuelor": false
+    }
+  ]
+}

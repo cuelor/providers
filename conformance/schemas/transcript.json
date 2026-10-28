@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuelor.com/schemas/provider/v1/transcript.json",
+  "title": "Transcript (application/vnd.cuelor.transcript+json)",
+  "description": "Result of an audio2text job, and the format for importing external transcriptions. Ordering and overlap rules for `timed_text_units` cannot be expressed in JSON Schema; see the specification, section 3.7.2.",
+  "type": "object",
+  "required": ["schema_version", "unit", "text", "segments"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "language": {
+      "description": "Detected or requested language, BCP 47.",
+      "$ref": "common.json#/$defs/language_tag"
+    },
+    "language_probability": { "type": "number", "minimum": 0, "maximum": 1 },
+    "unit": {
+      "description": "Actual granularity of `timed_text_units`. Required; services MUST fill it in truthfully.",
+      "enum": ["word", "character", "token"]
+    },
+    "text": { "type": "string" },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" },
+          "start_ms": { "type": "integer", "minimum": 0 },
+          "end_ms": { "type": "integer", "minimum": 0 },
+          "speaker": { "type": "string" },
+          "timed_text_units": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["text", "start_ms", "end_ms"],
+              "properties": {
+                "text": { "type": "string" },
+                "start_ms": { "type": "integer", "minimum": 0 },
+                "end_ms": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      }
+    }
+  }
+}

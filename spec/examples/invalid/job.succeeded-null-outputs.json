@@ -1,0 +1,25 @@
+{
+  "id": "job_7c1a90",
+  "status": "succeeded",
+  "model": "example/video-1",
+  "route": "multimodal2video",
+  "created_at": "2026-10-23T08:00:00Z",
+  "updated_at": "2026-10-23T08:01:12Z",
+  "progress": {
+    "percent": 100
+  },
+  "approval": null,
+  "outputs": null,
+  "error": null,
+  "usage": {
+    "amount": 0.6,
+    "unit": "USD",
+    "basis": "billed"
+  },
+  "warnings": [
+    {
+      "code": "prompt_rewritten",
+      "message": "The upstream rewrote the prompt before generating."
+    }
+  ]
+}

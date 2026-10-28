@@ -1,0 +1,20 @@
+{
+  "manifest_version": 1,
+  "id": "cuelor.openrouter",
+  "name": "OpenRouter",
+  "version": "0.1.0",
+  "description": "Images, video and transcription through your own OpenRouter account. Costs go to your OpenRouter balance.",
+  "publisher": "cuelor",
+  "repository": "https://github.com/cuelor/providers",
+  "license": "Apache-2.0",
+  "protocol": "1.0",
+  "capabilities": ["image", "video", "transcription"],
+  "runtime": { "kind": "node", "entry": "provider.mjs" },
+  "network": ["openrouter.ai"],
+  "setup": { "login_command": ["login"], "docs": "https://github.com/cuelor/providers/tree/main/providers/openrouter#setup" },
+  "test": {
+    "image": { "model": "bytedance-seed/seedream-4.5", "route": "text2image", "parameters": { "prompt": "a red square on a white background" } },
+    "video": { "model": "bytedance/seedance-2.0-fast", "route": "text2video", "parameters": { "prompt": "a blue sky with one white cloud" } },
+    "transcription": { "model": "openai/whisper-1", "route": "audio2text", "parameters": { "timestamps": "word" } }
+  }
+}
