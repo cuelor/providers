@@ -3,7 +3,8 @@
 The open part of Cuelor's provider protocol: everything you need to connect an image, video or
 speech-recognition service to the [Cuelor](https://cuelor.com) desktop app.
 
-> **Status:** the specification is at v1.0.1 (`spec-v1.0.1`). The SDK, the conformance suite and the
+> **Status:** the specification is at v1.0.1 (`spec-v1.0.1`). The conformance suite is released:
+> `go install github.com/cuelor/providers/conformance/cmd/cuelor-provider-test@latest`. The SDK and the
 > plugins are not released yet.
 
 A provider is a small HTTP service that speaks **Cuelor Provider API v1**: it describes itself and its

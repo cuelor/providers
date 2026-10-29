@@ -190,7 +190,7 @@ twice upstream is not visible to a test; the SDK's idempotency store and code re
 
 | Id | Check | Passes when | Implemented in |
 |---|---|---|---|
-| C1 | Transcription | With the suite's Chinese and English samples: `schema_version` 1; `language` matches the sample; `unit` set; units ordered, not overlapping, ending no more than 60 ms after the audio; character error rate against the known text below 30 % (this only catches gross mismatches; it does not rate quality) | `checks_c.go` `checkC1`, `transcriptIssues`, `unitIssues` |
+| C1 | Transcription | With the suite's Chinese and English samples, requested with the finest `timestamps` value the catalog allows (`word`, then `segment`, then `none`; `enum_values` limits the choice, no `enum_values` means `word`, and a route without the parameter sends nothing and is checked as `word`): `schema_version` 1; `language` matches the sample; `unit` set; for `word`, units ordered, not overlapping, ending no more than 60 ms after the audio; for `segment`, the same of the segments that give `start_ms` and `end_ms` (units are not required); for `none`, no timing is checked. Any value other than `word` adds a warning, because the Cuelor app requires `word` for per-take transcription (section 3.7.1); the warning does not fail the check. C1 and C2 name the requested value in their notes; character error rate against the known text below 30 % (this only catches gross mismatches; it does not rate quality) | `checks_c.go` `checkC1`, `transcriptIssues`, `unitIssues` |
 | C2 | Language detection | `language=auto` on the English sample reports `en` | `checkC2` |
 
 The samples are in [`samples/`](samples/) with their texts, durations and licence.

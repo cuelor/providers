@@ -215,8 +215,10 @@ type transcript struct {
 	Unit          string `json:"unit"`
 	Text          string `json:"text"`
 	Segments      []struct {
-		Text  string `json:"text"`
-		Units []struct {
+		Text    string `json:"text"`
+		StartMS *int64 `json:"start_ms"`
+		EndMS   *int64 `json:"end_ms"`
+		Units   []struct {
 			Text    string `json:"text"`
 			StartMS int64  `json:"start_ms"`
 			EndMS   int64  `json:"end_ms"`

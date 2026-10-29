@@ -15,7 +15,7 @@ import (
 )
 
 // Version is the version of this suite. It follows the specification's minor version.
-const Version = "1.0.1"
+const Version = "1.0.2"
 
 // ProtocolVersion is the protocol version the suite sends in the Cuelor-Protocol header.
 const ProtocolVersion = "1.0"

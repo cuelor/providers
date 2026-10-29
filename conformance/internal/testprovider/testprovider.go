@@ -36,6 +36,9 @@ import (
 //   - declare-video: generation is image and video, but the catalog has no video model.
 //   - declare-video-first: the same, with video declared before image.
 //   - image-unavailable, asr-unavailable: that model is listed with available false.
+//   - asr-timestamps-none, asr-timestamps-segment: test/asr allows only that timestamps value. Without
+//     either it allows none, segment and word. A request with another value is refused, and the
+//     transcript has the timing of the value that was asked for.
 //   - free-image: the catalog also has test/image:free, a copy of test/image whose id contains ":".
 
 // Options configures a Server.
@@ -77,6 +80,7 @@ type jobRec struct {
 	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
 	Inputs      []string   `json:"inputs"`
 	Language    string     `json:"language"`
+	Timestamps  string     `json:"timestamps,omitempty"`
 	OutputID    string     `json:"output_id,omitempty"`
 	Polls       int        `json:"polls"`
 }
@@ -269,6 +273,17 @@ func (s *Server) price() float64 {
 	return 0
 }
 
+// timestampsValues is what test/asr allows for `timestamps`; the first one is its default.
+func (s *Server) timestampsValues() []string {
+	switch {
+	case s.fault("asr-timestamps-none"):
+		return []string{"none"}
+	case s.fault("asr-timestamps-segment"):
+		return []string{"segment"}
+	}
+	return []string{"word", "segment", "none"}
+}
+
 func (s *Server) catalog() map[string]any {
 	pricing := map[string]any{"basis": "exact", "unit": "job", "amount": s.price(), "currency": "USD"}
 	steps := map[string]any{"name": "steps", "kind": "integer", "default": 4, "min": 1, "max": 10, "step": 1, "widget": "slider"}
@@ -322,7 +337,7 @@ func (s *Server) catalog() map[string]any {
 		"output": map[string]any{"modality": "text"},
 		"parameters": []any{
 			map[string]any{"name": "language", "kind": "string", "default": "auto"},
-			map[string]any{"name": "timestamps", "kind": "enum", "default": "word", "enum_values": []string{"none", "segment", "word"}},
+			map[string]any{"name": "timestamps", "kind": "enum", "default": s.timestampsValues()[0], "enum_values": s.timestampsValues()},
 		},
 		"routes": []any{map[string]any{
 			"id": "audio2text",
@@ -507,8 +522,14 @@ func (s *Server) validate(req *jobRequest, r *http.Request) *apiError {
 	if ratio, ok := params["ratio"]; ok && ratio != "1:1" && ratio != "16:9" {
 		return invalid("invalid_parameter", "ratio must be 1:1 or 16:9")
 	}
-	if ts, ok := params["timestamps"]; ok && ts != "none" && ts != "segment" && ts != "word" {
-		return invalid("invalid_parameter", "timestamps must be none, segment or word")
+	if ts, ok := params["timestamps"]; ok {
+		allowed := false
+		for _, v := range s.timestampsValues() {
+			allowed = allowed || ts == v
+		}
+		if !allowed {
+			return invalid("invalid_parameter", "parameter timestamps must be one of %s", strings.Join(s.timestampsValues(), ", "))
+		}
 	}
 	prompt, _ := params["prompt"].(string)
 	if strings.HasPrefix(req.Model, "test/image") && prompt == "" {
@@ -606,6 +627,10 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 		j.Inputs = append(j.Inputs, in.ArtifactID)
 	}
 	j.Language, _ = req.Parameters["language"].(string)
+	j.Timestamps, _ = req.Parameters["timestamps"].(string)
+	if j.Timestamps == "" {
+		j.Timestamps = s.timestampsValues()[0] // the catalog's default
+	}
 	s.st.Jobs[j.ID] = j
 	s.st.Keys[key] = keyRec{BodyHash: hash, JobID: j.ID}
 	s.save()
@@ -707,7 +732,7 @@ func (s *Server) outputLocked(j *jobRec) *artifact {
 				audio = a.Data
 			}
 		}
-		data, mediaType = s.transcribe(audio, j.Language), "application/vnd.cuelor.transcript+json"
+		data, mediaType = s.transcribe(audio, j.Language, j.Timestamps), "application/vnd.cuelor.transcript+json"
 	} else {
 		data = solidPNG(j.ID)
 	}
@@ -733,7 +758,7 @@ func solidPNG(seed string) []byte {
 }
 
 // transcribe "recognises" a WAV by the JSON in its LIST/INFO/ICMT chunk.
-func (s *Server) transcribe(wav []byte, language string) []byte {
+func (s *Server) transcribe(wav []byte, language, timestamps string) []byte {
 	info, durationMS := wavInfo(wav)
 	var known struct {
 		Language string `json:"language"`
@@ -775,9 +800,28 @@ func (s *Server) transcribe(wav []byte, language string) []byte {
 		}
 		units = append(units, map[string]any{"text": w, "start_ms": start, "end_ms": end})
 	}
+	segments := []any{map[string]any{"text": known.Text, "start_ms": 0, "end_ms": durationMS, "timed_text_units": units}}
+	switch timestamps {
+	case "segment":
+		// Two segments with times, no units.
+		half := len(known.Text) / 2
+		for half < len(known.Text) && known.Text[half] != ' ' && known.Text[half]&0xC0 != 0xC0 {
+			half++
+		}
+		second := durationMS / 2
+		if s.fault("overlapping-segments") {
+			second = durationMS/2 - 500
+		}
+		segments = []any{
+			map[string]any{"text": known.Text[:half], "start_ms": 0, "end_ms": durationMS / 2},
+			map[string]any{"text": known.Text[half:], "start_ms": second, "end_ms": durationMS},
+		}
+	case "none":
+		segments = []any{map[string]any{"text": known.Text}}
+	}
 	out, _ := json.Marshal(map[string]any{
 		"schema_version": 1, "language": known.Language, "unit": unit, "text": known.Text,
-		"segments": []any{map[string]any{"text": known.Text, "start_ms": 0, "end_ms": durationMS, "timed_text_units": units}},
+		"segments": segments,
 		"provider": map[string]any{"name": "test-asr"},
 	})
 	return out
