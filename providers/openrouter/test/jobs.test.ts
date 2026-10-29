@@ -210,9 +210,9 @@ for (const [model, language, expectedLanguage] of [["openai/whisper-1", undefine
     assert.equal(job.status, "succeeded", JSON.stringify(job.error));
     const t = (await p.call("GET", `/v1/artifacts/${job.outputs[0].artifact_id}/content`)).json;
     assert.equal(t.language, expectedLanguage);
-    assert.equal(t.text, "The quick brown fox jumps over the lazy dog.");
+    assert.equal(t.text, "Alice was beginning to get very tired of sitting by her sister on the bank and of having nothing to do.");
     const units = t.segments.flatMap((s: any) => s.timed_text_units);
-    assert.equal(units.length, 9, "the sound event is not a unit");
+    assert.equal(units.length, 21, "the sound event is not a unit");
     for (let i = 1; i < units.length; i++) assert.ok(units[i].start_ms >= units[i - 1].end_ms, "no overlap");
     const sent = lastBody(p, "/api/v1/audio/transcriptions");
     assert.deepEqual([sent.response_format, sent.timestamp_granularities, sent.language], ["verbose_json", ["word"], language ? "en" : null]);

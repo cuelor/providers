@@ -254,7 +254,7 @@ test("probe: PNG size and WAV header", () => {
   const info = parseWav(wav)!;
   assert.equal(info.sampleRate, 16000);
   assert.equal(info.channels, 1);
-  assert.ok(Math.abs(info.durationMs - 3438) <= 1);
+  assert.ok(Math.abs(info.durationMs - 5860) <= 1);
   assert.equal(JSON.parse(info.info.ICMT!).language, "en");
 });
 

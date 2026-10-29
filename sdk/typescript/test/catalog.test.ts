@@ -175,6 +175,11 @@ test("numeric parameters may list their values, and a number's step may be fract
   assert.match(messages(model([{ name: "duration", kind: "integer", default: 4, enum_values: [4, "6"] }])), /enum_values of an integer parameter must be numbers/);
   assert.match(messages(model([{ name: "duration", kind: "integer", default: 4, enum_values: [4, 6.5] }])), /enum_values of an integer parameter must be whole numbers/);
   assert.match(messages(model([{ name: "motion", kind: "number", default: 0.5, enum_values: [0.5, true] }])), /enum_values of a number parameter must be numbers/);
+  // An empty enum_values is refused for every kind, with the fix in the message.
+  for (const kind of ["enum", "integer", "number"] as const) {
+    const msgs = validateCatalog(model([{ name: "duration", kind, enum_values: [] }])).map((p) => p.message);
+    assert.deepEqual(msgs, [`enum_values of parameter "duration" is an empty list: omit enum_values instead of sending an empty list`], kind);
+  }
   // Without min, values are aligned from 0.
   assert.match(messages(model([{ name: "offset", kind: "number", default: 0.6, step: 0.25 }])), /not min \+ k \* step/);
 

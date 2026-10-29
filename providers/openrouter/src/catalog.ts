@@ -68,7 +68,7 @@ export function buildCatalog(lists: UpstreamLists): Catalog {
   return { models };
 }
 
-function enumParameter(name: string, label: string, values: string[], preferred: string[]): Parameter | undefined {
+export function enumParameter(name: string, label: string, values: string[], preferred: string[]): Parameter | undefined {
   const unique = [...new Set(values.filter((v) => typeof v === "string" && v !== ""))];
   if (unique.length === 0) return undefined;
   const fallback = unique[0]!;

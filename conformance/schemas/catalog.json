@@ -72,8 +72,9 @@
         "required": { "type": "boolean" },
         "default": {},
         "enum_values": {
-          "description": "Allowed values. Required for `enum`. A `number` or `integer` parameter MAY list its allowed values here too, as numbers of its kind (for example `duration` with `[4, 6, 8]`); clients MUST support this.",
+          "description": "Allowed values. Required for `enum`. A `number` or `integer` parameter MAY list its allowed values here too, as numbers of its kind (for example `duration` with `[4, 6, 8]`); clients MUST support this. When listed, the array MUST NOT be empty; with no values to list, omit the field.",
           "type": "array",
+          "minItems": 1,
           "items": { "type": ["string", "number", "integer", "boolean"] }
         },
         "min": { "type": "number" },

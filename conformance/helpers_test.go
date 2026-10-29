@@ -259,12 +259,20 @@ func TestNumericParameters(t *testing.T) {
 		{`{"name":"duration","kind":"integer","default":4,"enum_values":[4,6.5]}`, "enum_values of an integer parameter must be whole numbers"},
 		{`{"name":"motion","kind":"number","default":0.5,"enum_values":[0.5,true]}`, "enum_values of a number parameter must be numbers"},
 		{`{"name":"motion","kind":"number","default":0.35,"min":0,"max":1,"step":0.1}`, "min + k * step"},
+		// An empty list is never valid, for any kind; the reason names the parameter and the fix.
+		{`{"name":"duration","kind":"number","required":true,"default":4,"enum_values":[],"min":4,"max":15,"step":1}`, `enum_values of parameter "duration" is an empty list: omit enum_values instead of sending an empty list`},
+		{`{"name":"duration","kind":"integer","default":4,"enum_values":[]}`, `enum_values of parameter "duration" is an empty list: omit enum_values instead of sending an empty list`},
+		{`{"name":"ratio","kind":"enum","enum_values":[]}`, `enum_values of parameter "ratio" is an empty list: omit enum_values instead of sending an empty list`},
 		{`{"name":"seconds","kind":"number","default":9876543.25,"min":0,"step":0.1}`, "min + k * step"},
 	}
 	for _, tc := range invalid {
 		if got := problems(tc.param); !strings.Contains(got, tc.want) {
 			t.Errorf("%s: missing %q in %q", tc.param, tc.want, got)
 		}
+	}
+	// One failure per empty list, not one per rule it breaks.
+	if got := problems(`{"name":"ratio","kind":"enum","default":"1:1","enum_values":[]}`); strings.Count(got, "\n") != 0 {
+		t.Errorf("an empty enum_values is reported once: %q", got)
 	}
 }
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Cuelor Provider API
-  version: 1.0.0
+  version: 1.0.1
   summary: The protocol between Cuelor and image, video and speech-recognition services.
   description: |
     The normative text is `spec/v1.md`; the JSON Schemas in `spec/schemas/` are the source of truth for

@@ -381,7 +381,11 @@ func parameterProblems(p *parameter) []string {
 	if p.Min != nil && p.Max != nil && *p.Min > *p.Max {
 		add("min %g > max %g", *p.Min, *p.Max)
 	}
-	if p.Kind == "enum" && len(p.EnumValues) == 0 {
+	switch {
+	case p.EnumValues != nil && len(p.EnumValues) == 0:
+		// Any kind: a listed enum_values is never empty (spec/v1.md section 3.3).
+		add("enum_values of parameter %q is an empty list: omit enum_values instead of sending an empty list", p.Name)
+	case p.Kind == "enum" && len(p.EnumValues) == 0:
 		add("an enum without enum_values")
 	}
 	if p.Kind == "integer" {

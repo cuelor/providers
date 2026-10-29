@@ -101,7 +101,7 @@ const PROBES: Record<(typeof FAULTS)[number], (r: Running) => Promise<boolean>> 
     }
     if (j.status !== "succeeded") return false;
     const t = (await r.call("GET", `/v1/artifacts/${j.outputs[0].artifact_id}/content`)).json;
-    return t.text === "The quick brown fox jumps over the lazy dog.";
+    return t.text === "Alice was beginning to get very tired of sitting by her sister on the bank and of having nothing to do.";
   },
 };
 

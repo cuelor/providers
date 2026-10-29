@@ -3,6 +3,17 @@
 All notable changes to the specification and its schemas. Versions follow the protocol: within v1 only
 backward-compatible additions are allowed (`v1.md` section 3.11).
 
+## [1.0.1] - 2026-10-29
+
+Clarification of section 3.3; the meaning of the existing text does not change.
+
+- `enum_values`, when a parameter lists it, MUST NOT be empty, for any kind; with no values to list, the
+  field is omitted. The text did not say what an empty list means. By the existing rules such a catalog
+  was already not valid: "a value is then one of them" and "`default` MUST be inside `enum_values`" cannot
+  hold for an empty list. `schemas/catalog.json` now has `minItems: 1`, and conformance check A5 reports
+  an empty list with the parameter's name. An empty list is not the same as an omitted field.
+- `protocol.version` stays `1.0`.
+
 ## [1.0.0] - 2026-10-28
 
 First public version. The open questions of the draft were decided with the maintainers of the Cuelor

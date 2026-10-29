@@ -1,0 +1,2 @@
+{ "models": [{ "id": "m", "label": "M", "available": true, "output": { "modality": "video" }, "routes": [{ "id": "text2video", "input": { "slots": [] }, "parameter_names": ["duration"] }],
+  "parameters": [{ "name": "duration", "kind": "number", "required": true, "default": 4, "enum_values": [], "min": 4, "max": 15, "step": 1 }] }] }

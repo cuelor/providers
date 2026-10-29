@@ -136,7 +136,9 @@ export function validateCatalog(catalog: Catalog): CatalogProblem[] {
       params.set(p.name, p);
       if (p.min !== undefined && p.max !== undefined && p.min > p.max) problems.push({ path: pp, message: `min ${p.min} > max ${p.max}` });
       if (p.step !== undefined && !(p.step > 0)) problems.push({ path: pp, message: `step must be > 0` });
-      if (p.kind === "enum" && !(p.enum_values && p.enum_values.length > 0)) problems.push({ path: pp, message: "enum parameter without enum_values" });
+      if (p.enum_values !== undefined && p.enum_values.length === 0) {
+        problems.push({ path: pp, message: `enum_values of parameter "${p.name}" is an empty list: omit enum_values instead of sending an empty list` });
+      } else if (p.kind === "enum" && !p.enum_values) problems.push({ path: pp, message: "enum parameter without enum_values" });
       checkNumericEnum(p, pp, problems);
       checkDefault(p, pp, problems);
       checkDisplayShapes(p, pp, problems);

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import net from "node:net";
 import { test } from "node:test";
 import { NotSubmittedError, ProviderError, validateCatalog, validateTranscript } from "@cuelor/provider-sdk";
-import { buildCatalog, durationParameter, videoPrice, videoSize, type UpstreamLists } from "../src/catalog.ts";
+import { buildCatalog, durationParameter, enumParameter, videoPrice, videoSize, type UpstreamLists } from "../src/catalog.ts";
 import { OpenRouterClient, UpstreamHttpError, UpstreamNetworkError } from "../src/client.ts";
 import { baseUrlFromEnv, checkBaseUrl, DEFAULT_BASE_URL } from "../src/config.ts";
 import { backgroundFailure, isRetryable, moderationOf, submissionError } from "../src/errors.ts";
@@ -89,6 +89,20 @@ test("catalog: durations become a range when evenly spaced, else a list of integ
   // Uneven durations: an integer parameter that lists its values (v1.md section 3.3).
   assert.deepEqual(durationParameter([5, 10, 12]), { name: "duration", kind: "integer", default: 5, unit: "s", label: "Duration", enum_values: [5, 10, 12] });
   assert.equal(durationParameter([]), undefined);
+});
+
+test("catalog: a parameter with no values to list is left out, never sent with an empty enum_values", () => {
+  assert.equal(enumParameter("ratio", "Aspect ratio", [], ["1:1"]), undefined);
+  assert.equal(enumParameter("ratio", "Aspect ratio", ["", 5 as unknown as string], []), undefined, "every value filtered out");
+  assert.equal(durationParameter([]), undefined);
+  assert.equal(durationParameter([0, -3, 2.5]), undefined, "every duration filtered out");
+  const kept = enumParameter("ratio", "Aspect ratio", ["", "1:1", "1:1"], []);
+  assert.deepEqual(kept?.enum_values, ["1:1"]);
+});
+
+test("catalog: no parameter of any built model has an empty enum_values", async () => {
+  const lists = await mockLists();
+  for (const m of buildCatalog(lists).models) for (const p of m.parameters) assert.ok(p.enum_values === undefined || p.enum_values.length > 0, `${m.id}.${p.name}`);
 });
 
 test("catalog: transcription timestamps follow the table's whitelist", async () => {
