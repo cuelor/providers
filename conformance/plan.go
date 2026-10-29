@@ -52,12 +52,37 @@ func (j jobRequest) body() []byte {
 
 // livePlan is what tiers B and C submit.
 type livePlan struct {
-	// primary runs the B checks.
+	// primary runs the B checks: the case of the first capability that has one, generation
+	// capabilities first, transcription last.
 	primary *testCase
 	// extra are the other generation capabilities; each runs one job checked by B4, B5 and B10.
 	extra []testCase
 	// transcription runs the C checks.
 	transcription *testCase
+	// missing are the declared capabilities without a test case, in the order they were looked at.
+	// Each fails the checks that would have tested it; the others run.
+	missing []missingCase
+}
+
+// missingCase is a declared capability the suite found no test case for.
+type missingCase struct {
+	capability string
+	reason     string
+}
+
+// detail says why a capability was not tested, for the checks it fails.
+func (m missingCase) detail() string {
+	return fmt.Sprintf("%s: no test case: %s; no job was submitted for %s", m.capability, m.reason, m.capability)
+}
+
+// missingFor returns the missing case of a capability, if any.
+func (p *livePlan) missingFor(capability string) (missingCase, bool) {
+	for _, m := range p.missing {
+		if m.capability == capability {
+			return m, true
+		}
+	}
+	return missingCase{}, false
 }
 
 func (r *runner) getPlan() (*livePlan, error) {
@@ -65,6 +90,7 @@ func (r *runner) getPlan() (*livePlan, error) {
 	return r.plan, r.planErr
 }
 
+// makePlan looks for a test case for every declared capability. It fails only when none has one.
 func (r *runner) makePlan() (*livePlan, error) {
 	if r.desc == nil {
 		return nil, fmt.Errorf("GET /v1/provider failed: %v", r.descErr)
@@ -77,7 +103,8 @@ func (r *runner) makePlan() (*livePlan, error) {
 	for _, capability := range caps.Generation {
 		tc, err := r.findCase(capability)
 		if err != nil {
-			return nil, err
+			plan.missing = append(plan.missing, missingCase{capability, err.Error()})
+			continue
 		}
 		if plan.primary == nil {
 			plan.primary = tc
@@ -88,21 +115,37 @@ func (r *runner) makePlan() (*livePlan, error) {
 	if caps.Transcription {
 		tc, err := r.findCase("transcription")
 		if err != nil {
-			return nil, err
-		}
-		plan.transcription = tc
-		if plan.primary == nil {
-			plan.primary = tc
+			plan.missing = append(plan.missing, missingCase{"transcription", err.Error()})
+		} else {
+			plan.transcription = tc
+			if plan.primary == nil {
+				plan.primary = tc
+			}
 		}
 	}
 	if plan.primary == nil {
-		return nil, fmt.Errorf("the service declares neither generation nor transcription")
+		if len(plan.missing) == 0 {
+			return nil, fmt.Errorf("the service declares neither generation nor transcription")
+		}
+		reasons := []string{}
+		for _, m := range plan.missing {
+			reasons = append(reasons, m.capability+": "+m.reason)
+		}
+		return nil, fmt.Errorf("no declared capability has a test case (%s)", strings.Join(reasons, "; "))
 	}
 	return plan, nil
 }
 
-// findCase takes the manifest's test entry for a capability, or the first suitable model.
+// findCase takes the model given with --model (Options.Models) for a capability, else the manifest's
+// test entry, else the first suitable model in the catalog.
 func (r *runner) findCase(capability string) (*testCase, error) {
+	if choice, ok := r.opts.Models[capability]; ok {
+		m, rt, err := r.resolveChoice(capability, choice)
+		if err != nil {
+			return nil, fmt.Errorf("--model %s=%s: %v", capability, choice, err)
+		}
+		return &testCase{capability, m, rt, map[string]any{}, "--model " + capability}, nil
+	}
 	if r.manifest != nil {
 		if entry, ok := r.manifest.Test[capability]; ok {
 			m := r.findModel(entry.Model)
@@ -124,20 +167,71 @@ func (r *runner) findCase(capability string) (*testCase, error) {
 		if !m.Available {
 			continue
 		}
-		for j := range m.Routes {
-			rt := &m.Routes[j]
-			matches := false
-			if capability == "transcription" {
-				matches = rt.ID == "audio2text"
-			} else {
-				matches = m.Output.Modality == capability && rt.ID != "audio2text"
-			}
-			if matches && canFill(rt) {
-				return &testCase{capability, m, rt, map[string]any{}, "the first suitable model in the catalog"}, nil
-			}
+		if rt := firstRoute(m, capability); rt != nil {
+			return &testCase{capability, m, rt, map[string]any{}, "the first suitable model in the catalog"}, nil
 		}
 	}
-	return nil, fmt.Errorf("no available model for %s whose required inputs the suite can provide; add test.%s to the manifest", capability, capability)
+	return nil, fmt.Errorf("no available model for %s whose required inputs the suite can provide; add test.%s to the manifest or use --model", capability, capability)
+}
+
+// resolveChoice finds the model and route of a --model value, "<model>" or "<model>:<route>". The
+// whole value is looked up as a model id first, since ids may contain ":"; only when no model has that
+// id is it split at the last ":". Without a route, the model's first route for the capability whose
+// required inputs the suite can provide is taken.
+func (r *runner) resolveChoice(capability, choice string) (*model, *route, error) {
+	m, routeID := r.findModel(choice), ""
+	if m == nil {
+		i := strings.LastIndex(choice, ":")
+		if i < 0 {
+			return nil, nil, fmt.Errorf("model %q is not in the catalog", choice)
+		}
+		if m, routeID = r.findModel(choice[:i]), choice[i+1:]; m == nil {
+			return nil, nil, fmt.Errorf("neither %q nor %q is a model in the catalog", choice, choice[:i])
+		}
+		if routeID == "" {
+			return nil, nil, fmt.Errorf("the route after %q is empty", choice[:i])
+		}
+	}
+	if !m.Available {
+		return nil, nil, fmt.Errorf("model %q is not available", m.ID)
+	}
+	if routeID == "" {
+		if rt := firstRoute(m, capability); rt != nil {
+			return m, rt, nil
+		}
+		return nil, nil, fmt.Errorf("model %q has no %s route whose required inputs the suite can provide", m.ID, capability)
+	}
+	rt := m.route(routeID)
+	switch {
+	case rt == nil:
+		return nil, nil, fmt.Errorf("model %q has no route %q", m.ID, routeID)
+	case !servesCapability(m, rt, capability):
+		return nil, nil, fmt.Errorf("route %q of model %q is not for %s", routeID, m.ID, capability)
+	case !canFill(rt):
+		return nil, nil, fmt.Errorf("the suite has no samples for the required inputs of route %q of model %q", routeID, m.ID)
+	}
+	return m, rt, nil
+}
+
+// firstRoute returns a model's first route for a capability whose required inputs the suite can
+// provide, or nil.
+func firstRoute(m *model, capability string) *route {
+	for j := range m.Routes {
+		rt := &m.Routes[j]
+		if servesCapability(m, rt, capability) && canFill(rt) {
+			return rt
+		}
+	}
+	return nil
+}
+
+// servesCapability reports whether a route tests a capability: audio2text for transcription, any other
+// route of a model with that output modality for generation.
+func servesCapability(m *model, rt *route, capability string) bool {
+	if capability == "transcription" {
+		return rt.ID == "audio2text"
+	}
+	return m.Output.Modality == capability && rt.ID != "audio2text"
 }
 
 func (r *runner) findModel(id string) *model {
@@ -363,8 +457,9 @@ func numberParam(tc *testCase, req jobRequest, name string) (float64, bool) {
 	return 0, false
 }
 
-// jobsPlanned counts the jobs the selected live checks create with the primary case.
-func (r *runner) jobsPlanned(selected func(string) bool) (primary, transcriptionEN, transcriptionZH int) {
+// jobsPlanned counts the jobs the selected live checks create with the primary case, and with the
+// transcription case when there is one.
+func (r *runner) jobsPlanned(selected func(string) bool, transcription bool) (primary, transcriptionEN, transcriptionZH int) {
 	flow := false
 	for _, id := range []string{"B1", "B2", "B3", "B4", "B5", "B10"} {
 		flow = flow || selected(id)
@@ -392,7 +487,7 @@ func (r *runner) jobsPlanned(selected func(string) bool) (primary, transcription
 	if selected("B11") && r.desc.Capabilities.Estimate {
 		primary++
 	}
-	if r.desc.Capabilities.Transcription {
+	if transcription {
 		if selected("C1") {
 			transcriptionEN++
 			transcriptionZH++
@@ -405,8 +500,9 @@ func (r *runner) jobsPlanned(selected func(string) bool) (primary, transcription
 }
 
 // budget estimates the cost of the live run once and returns a note about it, or an error when the
-// run would cost more than MaxCost or its cost cannot be estimated. Over the budget no job is
-// submitted at all: tiers B and C fail as not run and A6 leaves out its valid submission.
+// run would cost more than MaxCost or its cost cannot be estimated. Only capabilities with a test case
+// are counted: the others submit no job. Over the budget no job is submitted at all: tiers B and C
+// fail as not run and A6 leaves out its valid submission.
 func (r *runner) budget() (string, error) {
 	r.budgetOnce.Do(func() { r.budgetNote, r.budgetErr = r.checkBudget() })
 	return r.budgetNote, r.budgetErr
@@ -437,7 +533,7 @@ func (r *runner) checkBudget() (string, error) {
 				panic(p)
 			}
 		}()
-		primaryJobs, en, zh := r.jobsPlanned(func(id string) bool { return r.selected[id] })
+		primaryJobs, en, zh := r.jobsPlanned(func(id string) bool { return r.selected[id] }, plan.transcription != nil)
 		add := func(tc *testCase, audio *speechSample, n int) error {
 			if n == 0 {
 				return nil

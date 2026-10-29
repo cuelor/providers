@@ -372,12 +372,14 @@ func TestHandshakeFailureFailsEveryCheck(t *testing.T) {
 func TestInvalidOptions(t *testing.T) {
 	one := 1.0
 	cases := map[string]Options{
-		"live without max cost": {URL: "http://127.0.0.1:1", Token: "x", Live: true},
-		"command and URL":       {URL: "http://127.0.0.1:1", Token: "x", Command: []string{"true"}},
-		"URL without token":     {URL: "http://127.0.0.1:1"},
-		"unknown check":         {URL: "http://127.0.0.1:1", Token: "x", Only: []string{"Z9"}},
-		"no target":             {},
-		"negative max cost":     {URL: "http://127.0.0.1:1", Token: "x", MaxCost: func() *float64 { v := -one; return &v }()},
+		"live without max cost":      {URL: "http://127.0.0.1:1", Token: "x", Live: true},
+		"command and URL":            {URL: "http://127.0.0.1:1", Token: "x", Command: []string{"true"}},
+		"URL without token":          {URL: "http://127.0.0.1:1"},
+		"unknown check":              {URL: "http://127.0.0.1:1", Token: "x", Only: []string{"Z9"}},
+		"no target":                  {},
+		"negative max cost":          {URL: "http://127.0.0.1:1", Token: "x", MaxCost: func() *float64 { v := -one; return &v }()},
+		"model without a name":       {URL: "http://127.0.0.1:1", Token: "x", Models: map[string]string{"image": ""}},
+		"model without a capability": {URL: "http://127.0.0.1:1", Token: "x", Models: map[string]string{"": "test/image"}},
 	}
 	for name, opts := range cases {
 		if _, err := Run(context.Background(), opts); !errors.Is(err, ErrInvalidOptions) {

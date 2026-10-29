@@ -30,6 +30,14 @@ import (
 	"unicode"
 )
 
+// Catalog modes change what the service declares and offers, without being defects. They are set
+// like faults:
+//
+//   - declare-video: generation is image and video, but the catalog has no video model.
+//   - declare-video-first: the same, with video declared before image.
+//   - image-unavailable, asr-unavailable: that model is listed with available false.
+//   - free-image: the catalog also has test/image:free, a copy of test/image whose id contains ":".
+
 // Options configures a Server.
 type Options struct {
 	Token   string
@@ -130,6 +138,17 @@ func (s *Server) save() {
 
 func (s *Server) fault(name string) bool { return s.opts.Faults[name] }
 
+// JobModels returns the model of every job created so far, in no particular order.
+func (s *Server) JobModels() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := []string{}
+	for _, j := range s.st.Jobs {
+		out = append(out, j.Model)
+	}
+	return out
+}
+
 // JobCount returns the number of jobs created so far.
 func (s *Server) JobCount() int {
 	s.mu.Lock()
@@ -224,11 +243,18 @@ func (s *Server) description() map[string]any {
 	if s.fault("short-binding") {
 		binding = binding[:16]
 	}
+	generation := []string{"image"}
+	if s.fault("declare-video") {
+		generation = []string{"image", "video"}
+	}
+	if s.fault("declare-video-first") {
+		generation = []string{"video", "image"}
+	}
 	return map[string]any{
 		"protocol": map[string]any{"version": "1.0"},
 		"provider": map[string]any{"id": "example.test", "name": "Test Provider", "version": "1.0.0"},
 		"capabilities": map[string]any{
-			"generation": []string{"image"}, "transcription": true, "cancel": true, "estimate": true,
+			"generation": generation, "transcription": true, "cancel": true, "estimate": true,
 			"webhook": false, "setup": false,
 		},
 		"account": map[string]any{"status": "ready", "label": "Test key", "binding": binding},
@@ -309,7 +335,22 @@ func (s *Server) catalog() map[string]any {
 			"pricing":         pricing,
 		}},
 	}
-	return map[string]any{"models": []any{image, asr}}
+	models := []any{image}
+	if s.fault("free-image") {
+		free := map[string]any{}
+		for k, v := range image {
+			free[k] = v
+		}
+		free["id"], free["label"] = "test/image:free", "Test Image (free)"
+		models = append(models, free)
+	}
+	if s.fault("image-unavailable") {
+		image["available"] = false
+	}
+	if s.fault("asr-unavailable") {
+		asr["available"] = false
+	}
+	return map[string]any{"models": append(models, asr)}
 }
 
 func (s *Server) models(w http.ResponseWriter) { writeJSON(w, 200, s.catalog()) }
@@ -446,6 +487,9 @@ func (s *Server) validate(req *jobRequest, r *http.Request) *apiError {
 		"test/image": {"text2image": true, "image2image": true},
 		"test/asr":   {"audio2text": true},
 	}
+	if s.fault("free-image") {
+		routes["test/image:free"] = routes["test/image"]
+	}
 	rts, ok := routes[req.Model]
 	if !ok {
 		return invalid("unknown_model", "unknown model %q%s", req.Model, leak)
@@ -467,7 +511,7 @@ func (s *Server) validate(req *jobRequest, r *http.Request) *apiError {
 		return invalid("invalid_parameter", "timestamps must be none, segment or word")
 	}
 	prompt, _ := params["prompt"].(string)
-	if req.Model == "test/image" && prompt == "" {
+	if strings.HasPrefix(req.Model, "test/image") && prompt == "" {
 		return invalid("missing_parameter", "prompt is required")
 	}
 	if len([]rune(prompt)) > 500 {

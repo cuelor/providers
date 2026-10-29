@@ -88,6 +88,14 @@ type Options struct {
 	MaxCost *float64
 	// Only limits the run to these check ids, for example {"A3", "B2"}.
 	Only []string
+	// Models chooses the test case of a capability (a generation capability such as "image", or
+	// "transcription"), as "<model>" or "<model>:<route>". The whole value is looked up as a model id
+	// first, since ids may contain ":"; only when no model has that id is it split at the last ":".
+	// Without a route the model's first route for the capability whose required inputs the suite can
+	// provide is taken. A choice comes before the manifest's test entry and is sent without that
+	// entry's parameters. A choice the catalog cannot satisfy fails only that capability's checks; a
+	// capability the service does not declare fails A1.
+	Models map[string]string
 
 	// RequestTimeout is the timeout of one request, except uploads and downloads. Default 30 s.
 	RequestTimeout time.Duration
@@ -114,8 +122,8 @@ type Result struct {
 	DurationMS int64  `json:"duration_ms"`
 	Detail     string `json:"detail"`
 	// NotRun marks a failed check that did not run: the live run was over --max-cost or its cost
-	// could not be estimated, or the run was cancelled. No job was submitted for it. Detail starts
-	// with "not run: ". Always false for other statuses.
+	// could not be estimated, the capability it tests has no test case, or the run was cancelled. No
+	// job was submitted for it. Detail starts with "not run: ". Always false for other statuses.
 	NotRun bool `json:"not_run,omitempty"`
 }
 
@@ -240,6 +248,11 @@ func (o *Options) normalize() error {
 	}
 	if o.MaxCost != nil && *o.MaxCost < 0 {
 		return optionsError("MaxCost must not be negative")
+	}
+	for capability, choice := range o.Models {
+		if capability == "" || choice == "" {
+			return optionsError("Models needs a capability and a model, got %q=%q", capability, choice)
+		}
 	}
 	if o.URL != "" {
 		if len(o.Command) > 0 {

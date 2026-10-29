@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cuelor/providers/conformance/internal/testprovider"
@@ -95,5 +97,45 @@ func TestEnvByName(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := run([]string{"--env", "CUELOR_PROVIDER_TEST_UNSET_VARIABLE", "--url", "http://127.0.0.1:1"}, &out, &errOut); code != 2 {
 		t.Errorf("--env with an unset name: exit %d, want 2", code)
+	}
+}
+
+// --model is parsed before the service is contacted: a malformed or repeated value is a usage error
+// and no request is sent. A valid one chooses the case the B checks run.
+func TestModelFlag(t *testing.T) {
+	tok := "t0k3nt0k3nt0k3nt0k3nt0k3nt0k3nt0k3n"
+	var requests atomic.Int64
+	provider := testprovider.New(testprovider.Options{Token: tok, Faults: map[string]bool{"free-image": true}})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		provider.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	t.Setenv("CUELOR_PROVIDER_TEST_TOKEN", tok)
+	base := []string{"--url", srv.URL, "--live", "--max-cost", "0"}
+	for _, bad := range [][]string{
+		{"--model", "image"},
+		{"--model", "=test/image"},
+		{"--model", "image="},
+		{"--model", "image=test/image", "--model", "image=test/image:image2image"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(append(append([]string{}, base...), bad...), &out, &errOut); code != 2 {
+			t.Errorf("%q: exit %d, want 2", bad, code)
+		}
+		if !strings.Contains(errOut.String(), "-model") {
+			t.Errorf("%q: the error does not name --model: %s", bad, errOut.String())
+		}
+	}
+	if n := requests.Load(); n != 0 {
+		t.Fatalf("%d requests were sent for usage errors, want none", n)
+	}
+	var out, errOut bytes.Buffer
+	args := append(append([]string{}, base...), "--only", "B1", "--output", "json", "--model", "image=test/image:free:image2image")
+	if code := run(args, &out, &errOut); code != 0 {
+		t.Fatalf("exit %d: %s %s", code, out.String(), errOut.String())
+	}
+	if !strings.Contains(out.String(), "job for image (test/image:free, image2image), from --model image") {
+		t.Errorf("B1 does not use the --model case: %s", out.String())
 	}
 }

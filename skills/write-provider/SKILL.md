@@ -80,7 +80,8 @@ test variant. Keep `src/main.ts` and `tsconfig.json`. Delete `src/fake-upstream.
   (`release.yml` refuses a tag that differs from `package.json` or the built manifest).
 - `capabilities` here is a display list (`image`, `video`, `transcription`). The authoritative object is
   the definition's `capabilities` (step 4).
-- `test` names the **cheapest** model and parameters per capability; tiers B and C use them.
+- `test` names the **cheapest** model and parameters per capability; tiers B and C use them (unless
+  `--model` chooses another).
 - Schema: `spec/schemas/manifest.json`.
 
 ### 3. Catalog
@@ -323,7 +324,9 @@ cuelor-provider-test --manifest dist/cuelor-provider.json --live --max-cost 0.50
 ```
 
 The suite estimates the cost first; above `--max-cost`, or when it cannot estimate, it submits nothing
-and the run fails with every B and C check `not run`. B6 and B7 kill the plugin
+and the run fails with every B and C check `not run`. A declared capability without a usable model
+fails only its own checks. To try another model without editing the manifest, add
+`--model <capability>=<model>[:<route>]`. B6 and B7 kill the plugin
 during a job and restart it: everything must be in the data directory, which the SDK handles as long as
 `submit` returns quickly and `poll` works after a restart.
 

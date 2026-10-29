@@ -55,10 +55,27 @@ func (r *runner) primaryFlow(c *checkCtx) *primaryRun {
 	plan := r.livePrelude(c)
 	r.primaryOnce.Do(func() {
 		r.primary = &primaryRun{tc: plan.primary, jobs: map[string]*checkCtx{}}
-		r.primary.ctx("B1").note("%s", r.budgetNote)
+		b1 := r.primary.ctx("B1")
+		b1.note("%s", r.budgetNote)
+		for _, tc := range plan.extra {
+			b1.note("also a job for %s, from %s, checked by B4, B5 and B10", tc.label(), tc.source)
+		}
+		if tc := plan.transcription; tc != nil && tc != plan.primary {
+			b1.note("transcription jobs for %s, from %s, checked by C1 and C2", tc.label(), tc.source)
+		}
 		r.runPrimary(r.primary)
 		for i := range plan.extra {
 			r.runExtra(r.primary, &plan.extra[i])
+		}
+		// A declared generation capability without a test case fails the checks its job would have
+		// gone into; the primary case and the other capabilities are still checked.
+		for _, m := range plan.missing {
+			if m.capability == "transcription" {
+				continue
+			}
+			for _, id := range []string{"B4", "B5", "B10"} {
+				r.primary.ctx(id).fail("%s", m.detail())
+			}
 		}
 	})
 	return r.primary

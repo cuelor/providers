@@ -27,12 +27,15 @@ cuelor-provider-test --command "node dist/provider.mjs" --only A3,B2 --output js
 # A running service: self-hosted, remote, or a plugin the app has already started.
 cuelor-provider-test --url https://provider.example.com --token-file token.txt
 CUELOR_PROVIDER_TEST_TOKEN=... cuelor-provider-test --url http://127.0.0.1:8787 --live --max-cost 0
+# The same, choosing the model of each capability instead of the catalog's first one.
+cuelor-provider-test --url http://127.0.0.1:8787 --token-file token.txt --live --max-cost 1 \
+  --model image=vendor/image-small --model video=vendor/clip-lite:text2video
 ```
 
 | Flag | Meaning |
 |---|---|
 | `--command "…"` | Start the plugin with this command line. Quotes and backslashes are honoured; there is no shell |
-| `--manifest PATH` | `cuelor-provider.json`. Its `id` and `version` are compared with the description (A1), its `test` entries choose the models for tiers B and C, and without `--command` its `runtime` is started |
+| `--manifest PATH` | `cuelor-provider.json`. Its `id` and `version` are compared with the description (A1), its `test` entries choose the models for tiers B and C (unless `--model` does), and without `--command` its `runtime` is started |
 | `--dir PATH` | Working directory of the plugin (default: the manifest's directory, else the current one) |
 | `--node PATH` | `node` for a manifest with `runtime.kind: node` (default: `node` on `PATH`) |
 | `--data-dir PATH` | `CUELOR_PROVIDER_DATA_DIR` for the plugin (default: a new temporary directory, removed afterwards) |
@@ -41,6 +44,7 @@ CUELOR_PROVIDER_TEST_TOKEN=... cuelor-provider-test --url http://127.0.0.1:8787 
 | `--token-file PATH` | Bearer token for `--url` (or `CUELOR_PROVIDER_TEST_TOKEN`) |
 | `--live` | Also run tiers B and C. They create real jobs and may cost money |
 | `--max-cost N` | Required with `--live`: the most the run may cost, in the service's `billing.unit` |
+| `--model CAP=MODEL[:ROUTE]` | Test capability `CAP` (a declared generation capability such as `image`, or `transcription`) with this model, in tiers B and C and A6. Repeatable, once per capability. Comes before the manifest's `test` entry, whose `parameters` are then not sent; required parameters are filled in as for a catalog model. See [Choosing the models](#choosing-the-models) |
 | `--only IDS` | Run only these checks, for example `A3,B2`. Results of the others are not reported |
 | `--output text\|json` | Report format (default `text`) |
 | `--timeout D`, `--job-timeout D` | One request (default 30s); one job until it ends (default 10m) |
@@ -49,7 +53,8 @@ CUELOR_PROVIDER_TEST_TOKEN=... cuelor-provider-test --url http://127.0.0.1:8787 
 | `--list`, `--version` | List the checks; print the version |
 
 **Exit status:** 0 when every check that ran passed (warnings and skips included), 1 when a check
-failed, 2 for invalid usage (for example `--live` without `--max-cost`).
+failed, 2 for invalid usage (for example `--live` without `--max-cost`, or a `--model` without `=` or given twice
+for one capability; nothing is sent to the service then).
 
 **JSON report** (`--output json`, and `Report.JSON()`):
 
@@ -70,8 +75,8 @@ URL form, no `--live`) and `warning` (passed, but a SHOULD was missed). The repo
 when any check failed, else `passed`.
 
 A failed check that **did not run** has `"not_run": true` and a `detail` that starts with `not run: `:
-the live run was over `--max-cost` or its cost could not be estimated (no job was submitted), or the
-run was cancelled first. It still counts as failed. The field is absent on every other result, so the
+the live run was over `--max-cost` or its cost could not be estimated (no job was submitted), the
+capability the check tests has no test case (C1 and C2, below), or the run was cancelled first. It still counts as failed. The field is absent on every other result, so the
 shape is otherwise unchanged; in Go it is `Result.NotRun`.
 
 ```json
@@ -88,14 +93,52 @@ shape is otherwise unchanged; in Go it is `Result.NotRun`.
   may create (from `POST /v1/estimates` when the service has it, else from the catalog's prices; B7's
   retries count in full). When that total is more than `--max-cost`, or cannot be worked out, **nothing
   is submitted and the run fails**: every B and C check is failed and `not_run`, with the estimate, the
-  limit and the unit, or the reason there is no estimate ([`v1.md` section 5](../spec/v1.md#5-conformance)). The jobs use the manifest's `test` entries (the cheapest model and
-  parameters per capability), else the first suitable route of the catalog.
+  limit and the unit, or the reason there is no estimate ([`v1.md` section 5](../spec/v1.md#5-conformance)). The estimate counts
+  only the capabilities that have a test case. Which model each capability uses: [Choosing the
+  models](#choosing-the-models).
 - **Capabilities decide what is required.** A declared capability must pass its checks; checks for
   capabilities not declared are skipped: B9 needs `capabilities.cancel`, B11 `capabilities.estimate`,
   C1 and C2 `capabilities.transcription`.
+- **A declared capability without a test case fails only its own checks.** The others still run, but the
+  run fails: a capability the service declares and the suite could not test never passes.
 - **A3, B6 and B7** need the command form: they close stdin or kill the process group.
 - Moderation is not tested: sending content that breaks an upstream's terms on purpose would break those
   terms.
+
+## Choosing the models
+
+Tiers B and C test every declared capability with one model and route, its **test case**. For each
+capability, in this order:
+
+1. `--model <capability>=<model>[:<route>]` (`Options.Models`). The whole value after `=` is first
+   looked up as a model id, since ids may contain `:`; only when no model has that id is it split at the
+   last `:` into model and route. `vendor/image:free` is the model `vendor/image:free` when the catalog
+   has it, else the route `free` of `vendor/image`; `vendor/image:free:text2image` is the route
+   `text2image` of `vendor/image:free`. Without a route the model's first route for the capability whose
+   required inputs the suite can provide is used. The request carries only required parameters.
+2. The manifest's `test.<capability>` entry, with its parameters.
+3. The first available model in the catalog with a route for the capability (`audio2text` for
+   transcription, any other route of a model with that output modality for generation) whose required
+   inputs the suite can provide.
+
+The **primary** case, which B1–B11 use, is that of the first capability that has one: the generation
+capabilities in the order the description lists them, then transcription. Each other generation
+capability runs one job, checked by B4, B5 and B10; transcription runs C1 and C2. B1's notes, and C1's
+and C2's, say which case each capability got and where it came from (`--model`, the manifest or the
+catalog).
+
+When a capability has **no test case** (its `--model` or manifest entry names a model that is not in the
+catalog, is not available, or lacks the route, the route is not for that capability, or no catalog model
+fits), no job is submitted for it and only its checks fail, saying why:
+
+- a generation capability other than the primary one: one failure each in B4, B5 and B10;
+- transcription: C1 and C2 fail as not run;
+- the primary capability: the next capability with a case becomes primary, and the missing one fails
+  B4, B5 and B10.
+
+When no declared capability has a test case, every B and C check fails as not run, with the reason for
+each capability. A `--model` for a capability the service does not declare, most likely misspelt, fails
+A1.
 
 ## Checks
 
@@ -106,7 +149,7 @@ that implements it. `go doc` on the function gives the same condition.
 
 | Id | Check | Passes when | Implemented in |
 |---|---|---|---|
-| A1 | Provider description | `GET /v1/provider` matches the schema; major version 1; `provider.id` and `version` match the manifest; `binding` is 64 hexadecimal digits | `checks_a.go` `checkA1` |
+| A1 | Provider description | `GET /v1/provider` matches the schema; major version 1; `provider.id` and `version` match the manifest; `binding` is 64 hexadecimal digits; every `--model` capability is declared | `checks_a.go` `checkA1` |
 | A2 | Authentication | Without a Bearer token, or with a wrong one (same length, one character longer, another scheme): 401 with a standard error body, on every endpoint | `checkA2` |
 | A3 | Local security (command form) | Listens on 127.0.0.1 only; rejects a `Host` other than `127.0.0.1:<port>`; rejects requests to `/v1/` with an `Origin` header (the setup page under `/setup/` may accept its own origin, plugins.md section 2); exits within 5 s of stdin closing and leaves no process in its group | `checkA3` |
 | A4 | Catalog format | `GET /v1/models` matches the schema | `checkA4` |
@@ -175,7 +218,7 @@ if !report.OK() { /* a check failed */ }
 | Name | |
 |---|---|
 | `Run(ctx, Options) (*Report, error)` | Runs the selected checks. An error means the options were invalid or the run could not be set up; a plugin that does not start is a failed report, not an error. Cancelling `ctx` stops the run and the plugin |
-| `Options` | `Command`, `Dir`, `Manifest`, `NodePath`, `Env`, `DataDir` (command form); `URL`, `Token` (URL form); `Live`, `MaxCost`, `Only`; `RequestTimeout`, `JobTimeout`, `StartTimeout`; `FFprobe`; `Log` (progress) and `PluginOutput` (the plugin's stdout and stderr) |
+| `Options` | `Command`, `Dir`, `Manifest`, `NodePath`, `Env`, `DataDir` (command form); `URL`, `Token` (URL form); `Live`, `MaxCost`, `Only`, `Models` (`--model`: capability to `"<model>[:<route>]"`); `RequestTimeout`, `JobTimeout`, `StartTimeout`; `FFprobe`; `Log` (progress) and `PluginOutput` (the plugin's stdout and stderr) |
 | `Report`, `Result` | `{Status, Summary, Checks}`, `{ID, Name, Status, DurationMS, Detail}`; `Report.OK()`, `Report.JSON()` |
 | `Checks() []CheckInfo` | Every check: `ID`, `Name`, `Tier`, `Condition` (when it applies) |
 | `Status`, `Tier` | `StatusPassed`, `StatusFailed`, `StatusSkipped`, `StatusWarning`; `TierA`, `TierB`, `TierC` |

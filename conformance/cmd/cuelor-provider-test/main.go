@@ -4,6 +4,7 @@
 //	cuelor-provider-test --command "node dist/provider.mjs" [--live --max-cost 0.50] [--only A3,B2] [--output json]
 //	cuelor-provider-test --manifest dist/cuelor-provider.json
 //	cuelor-provider-test --url https://provider.example.com --token-file token.txt
+//	cuelor-provider-test --url https://provider.example.com --live --max-cost 1 --model image=vendor/model --model video=vendor/clip:text2video
 //
 // Exit status: 0 when every check that ran passed, 1 when a check failed, 2 for invalid usage.
 package main
@@ -42,6 +43,35 @@ func (e *envList) Set(v string) error {
 	return nil
 }
 
+// modelList collects --model <capability>=<model>[:<route>]. Splitting the model from the route needs
+// the catalog, so the value after "=" is passed on whole.
+type modelList map[string]string
+
+func (m modelList) String() string {
+	out := []string{}
+	for k, v := range m {
+		out = append(out, k+"="+v)
+	}
+	return strings.Join(out, ",")
+}
+
+func (m modelList) Set(v string) error {
+	capability, choice, ok := strings.Cut(v, "=")
+	switch {
+	case !ok:
+		return fmt.Errorf("%q has no \"=\"; use <capability>=<model>[:<route>]", v)
+	case capability == "":
+		return fmt.Errorf("%q has no capability before \"=\"", v)
+	case choice == "":
+		return fmt.Errorf("%q has no model after \"=\"", v)
+	}
+	if _, dup := m[capability]; dup {
+		return fmt.Errorf("the capability %s is given more than once", capability)
+	}
+	m[capability] = choice
+	return nil
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -68,8 +98,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		list      = fs.Bool("list", false, "list the checks and exit")
 		version   = fs.Bool("version", false, "print the version and exit")
 		env       envList
+		models    = modelList{}
 	)
 	fs.Var(&env, "env", "KEY=VALUE, or NAME to copy NAME from this environment, added to the plugin's environment (repeatable; for development and test keys)")
+	fs.Var(models, "model", "the model tiers B and C (and A6) test a capability with, as <capability>=<model>[:<route>], for example\n"+
+		"image=vendor/model or video=vendor/model:text2video (repeatable, once per capability; <capability> is a\n"+
+		"declared generation capability or transcription). The whole value is looked up as a model id first, since ids\n"+
+		"may contain \":\"; only when no model has that id is it split at the last \":\" into model and route. Without a\n"+
+		"route the model's first route for the capability whose inputs the suite can provide is used. Comes before\n"+
+		"the manifest's test entry, whose parameters are then not sent")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -99,6 +136,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	opts := conformance.Options{
 		Dir: *dir, Manifest: *manifest, NodePath: *node, DataDir: *dataDir, Env: env,
 		URL: *target, Live: *live, RequestTimeout: *timeout, JobTimeout: *jobTO, FFprobe: *ffprobe,
+	}
+	if len(models) > 0 {
+		opts.Models = models
 	}
 	if *command != "" {
 		argv, err := conformance.SplitCommand(*command)

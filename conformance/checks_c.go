@@ -12,14 +12,23 @@ const (
 	unitEndToleranceMS    = 60
 )
 
-// transcribe uploads a sample, runs audio2text on it and returns the transcript. language "" leaves
-// the parameter out; "auto" asks for detection.
-func (r *runner) transcribe(c *checkCtx, sample speechSample, language string) *transcript {
+// transcriptionCase returns the case C1 and C2 run. Without one they fail as not run.
+func (r *runner) transcriptionCase(c *checkCtx) *testCase {
 	plan := r.livePrelude(c)
 	tc := plan.transcription
 	if tc == nil {
+		if m, ok := plan.missingFor("transcription"); ok {
+			c.notRunf("%s", m.detail())
+		}
 		c.fatal("no transcription model")
 	}
+	c.note("jobs for %s, from %s", tc.label(), tc.source)
+	return tc
+}
+
+// transcribe uploads a sample, runs audio2text on it and returns the transcript. language "" leaves
+// the parameter out; "auto" asks for detection.
+func (r *runner) transcribe(c *checkCtx, tc *testCase, sample speechSample, language string) *transcript {
 	req := r.buildRequest(c, tc, sample.data)
 	if tc.route.hasParam("language") {
 		if language != "" {
@@ -114,6 +123,7 @@ func unitIssues(t *transcript, durationMS int64) []string {
 // C1: transcribing the Chinese and English samples: schema_version 1, the sample's language, unit
 // set, units ordered and not overlapping and inside the audio, character error rate below 30 %.
 func checkC1(r *runner, c *checkCtx) {
+	tc := r.transcriptionCase(c)
 	samples, err := loadSpeechSamples()
 	if err != nil {
 		c.fatal("loading the samples: %v", err)
@@ -127,7 +137,7 @@ func checkC1(r *runner, c *checkCtx) {
 					}
 				}
 			}()
-			t := r.transcribe(c, s, s.Language)
+			t := r.transcribe(c, tc, s, s.Language)
 			transcriptIssues(c, s.Language+" sample", t, s)
 		}()
 	}
@@ -135,8 +145,9 @@ func checkC1(r *runner, c *checkCtx) {
 
 // C2: with language=auto the English sample is reported as en.
 func checkC2(r *runner, c *checkCtx) {
+	tc := r.transcriptionCase(c)
 	s := speechSampleFor("en")
-	t := r.transcribe(c, s, "auto")
+	t := r.transcribe(c, tc, s, "auto")
 	if primaryLanguage(t.Language) != "en" {
 		c.fail("with language=auto the English sample was reported as %q", t.Language)
 	} else {

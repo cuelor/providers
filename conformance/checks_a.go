@@ -45,9 +45,31 @@ func checkA1(r *runner, c *checkCtx) {
 	} else {
 		c.note("no manifest given; provider.id and provider.version were not compared with one")
 	}
+	declared := map[string]bool{"transcription": d.Capabilities.Transcription}
+	for _, g := range d.Capabilities.Generation {
+		declared[g] = true
+	}
+	for _, capability := range sortedKeys(r.opts.Models) {
+		if !declared[capability] {
+			c.fail("--model %s=%s names a capability the service does not declare (is it misspelt?); the service declares %s",
+				capability, r.opts.Models[capability], declaredCapabilities(d))
+		}
+	}
 	if d.Account.Status != "ready" {
 		c.note("account.status is %q; catalog and job endpoints are expected to answer 403 provider_not_ready", d.Account.Status)
 	}
+}
+
+// declaredCapabilities lists the capabilities a description declares, for details.
+func declaredCapabilities(d description) string {
+	out := append([]string{}, d.Capabilities.Generation...)
+	if d.Capabilities.Transcription {
+		out = append(out, "transcription")
+	}
+	if len(out) == 0 {
+		return "none"
+	}
+	return strings.Join(out, ", ")
 }
 
 // A2: requests without a bearer token or with a wrong one get 401 and the standard error body, on
@@ -493,7 +515,7 @@ func outputMatchesModality(modality, mediaType string) bool {
 // message without the token; a valid request with a new key still works afterwards.
 func checkA6(r *runner, c *checkCtx) {
 	cat := r.requireCatalog(c)
-	tc := chooseBaseline(cat, r.manifest)
+	tc := r.chooseBaseline(cat)
 	if tc == nil {
 		c.fatal("the catalog has no available model whose required inputs the suite can provide")
 	}
@@ -591,10 +613,15 @@ func checkA6(r *runner, c *checkCtx) {
 	r.rememberJob(j.ID)
 }
 
-// chooseBaseline picks the model and route A6 varies: a manifest test entry, else an available
-// route with a prompt and image inputs, else any route the suite can fill.
-func chooseBaseline(cat *catalog, m *manifest) *testCase {
-	if m != nil {
+// chooseBaseline picks the model and route A6 varies: a --model choice, else a manifest test entry,
+// else an available route with a prompt and image inputs, else any route the suite can fill.
+func (r *runner) chooseBaseline(cat *catalog) *testCase {
+	for _, capability := range sortedKeys(r.opts.Models) {
+		if mod, rt, err := r.resolveChoice(capability, r.opts.Models[capability]); err == nil {
+			return &testCase{capability, mod, rt, map[string]any{}, "--model " + capability}
+		}
+	}
+	if m := r.manifest; m != nil {
 		for _, capability := range []string{"image", "video", "transcription"} {
 			entry, ok := m.Test[capability]
 			if !ok {
